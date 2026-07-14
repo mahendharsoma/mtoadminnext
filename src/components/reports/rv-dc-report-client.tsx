@@ -55,7 +55,7 @@ export function RvDcReportClient({ data }: { data: RvDcReportRow[] }) {
           data={data}
           searchKey="rv_dc_number"
           searchPlaceholder="Search:"
-        />
+         exportTitle="RV-DC Report" exportFileName="rv-dc-report"/>
       </CardContent>
     </Card>
   );

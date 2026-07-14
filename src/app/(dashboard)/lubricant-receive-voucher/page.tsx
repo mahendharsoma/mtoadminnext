@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { lubricantRepository } from "@/lib/db/repositories/inspection.repository";
 import { LubricantVoucherClient } from "@/components/misc/lubricant-voucher-client";
 
@@ -5,7 +6,19 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0] ?? "";
 }
 
-export default async function LubricantReceiveVoucherPage({
+export default function LubricantReceiveVoucherPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from_date?: string; to_date?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <LubricantReceiveVoucherPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function LubricantReceiveVoucherPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ from_date?: string; to_date?: string }>;

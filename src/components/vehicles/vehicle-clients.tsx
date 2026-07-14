@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
-import { Car, Fuel, Pencil, Shield, Trash2 } from "lucide-react";
+import { Car, Fuel, MessageCircle, MoreHorizontal, Pencil, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/shared/data-table";
@@ -12,6 +12,14 @@ import { CrudDialog } from "@/components/shared/crud-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   createMakeTypeAction,
   updateMakeTypeAction,
@@ -35,11 +43,6 @@ export function MakeTypeClient({ items }: { items: VehicleMakeType[] }) {
   const [, startTransition] = useTransition();
 
   const columns: ColumnDef<VehicleMakeType>[] = [
-    {
-      id: "s_no",
-      header: "S.No",
-      cell: ({ row }) => row.index + 1,
-    },
     { accessorKey: "make_type_name", header: "Vehicle Make Type" },
     {
       id: "actions",
@@ -65,6 +68,14 @@ export function MakeTypeClient({ items }: { items: VehicleMakeType[] }) {
         data={items}
         searchKey="make_type_name"
         searchPlaceholder="Search..."
+        showSerialNumber
+        exportConfig={{
+          title: "Vehicle Make Types",
+          fileName: "vehicle-make-types",
+          columns: [
+            { header: "Vehicle Make Type", getValue: (r) => r.make_type_name },
+          ],
+        }}
       />
       {edit && (
         <CrudDialog title="Edit" onSubmit={updateMakeTypeAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>
@@ -88,6 +99,7 @@ export function VariantClient({ items, makeTypes }: { items: VehicleVariant[]; m
     { accessorKey: "status", header: "Status" },
     {
       id: "actions",
+      header: "Actions",
       cell: ({ row }) => (
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" onClick={() => setEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
@@ -114,7 +126,21 @@ export function VariantClient({ items, makeTypes }: { items: VehicleVariant[]; m
           <div className="space-y-2"><Label>Variant Name</Label><Input name="variant_name" required /></div>
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={items} searchKey="variant_name" />
+      <DataTable
+        columns={columns}
+        data={items}
+        searchKey="variant_name"
+        showSerialNumber
+        exportConfig={{
+          title: "Vehicle Variants",
+          fileName: "vehicle-variants",
+          columns: [
+            { header: "Make", getValue: (r) => r.make_type_name },
+            { header: "Variant", getValue: (r) => r.variant_name },
+            { header: "Status", getValue: (r) => r.status },
+          ],
+        }}
+      />
       {edit && (
         <CrudDialog title="Edit Variant" onSubmit={updateVariantAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>
           <input type="hidden" name="variant_id" value={edit.variant_id} />
@@ -169,11 +195,6 @@ export function VehiclesClient({
   }, [edit, selectedMakeTypeId]);
 
   const columns: ColumnDef<Vehicle>[] = [
-    {
-      id: "s_no",
-      header: "S.No",
-      cell: ({ row }) => row.index + 1,
-    },
     { accessorKey: "make_type_name", header: "Vehicle Make Type" },
     { accessorKey: "variant_name", header: "Vehicle Variant" },
     { accessorKey: "registration_no", header: "Registration Number" },
@@ -182,6 +203,7 @@ export function VehiclesClient({
     {
       id: "actions",
       header: "Actions",
+      enableSorting: false,
       cell: ({ row }) => {
         const vehicle = row.original;
         const officerMobile = vehicle.officer_mobile?.trim() ?? "";
@@ -191,10 +213,11 @@ export function VehiclesClient({
             : null;
 
         return (
-          <div className="flex flex-wrap items-center gap-1">
+          <div className="flex w-[140px] flex-nowrap items-center justify-end gap-0.5">
             <Button
               variant="ghost"
               size="icon"
+              className="h-8 w-8 shrink-0"
               title="Edit"
               onClick={() => {
                 setEdit(vehicle);
@@ -207,50 +230,90 @@ export function VehiclesClient({
               <Pencil className="h-4 w-4" />
             </Button>
 
-            {!whatsappLinks ? (
-              <span className="px-2 text-xs text-muted-foreground">Officer not assigned</span>
-            ) : (
-              <>
-                <Button variant="ghost" size="icon" asChild title="ADDL. QUOTA SANCTION">
-                  <a href={whatsappLinks.addQuota} target="_blank" rel="noopener noreferrer">
-                    <Fuel className="h-4 w-4" />
-                  </a>
-                </Button>
-                <Button variant="ghost" size="icon" asChild title="VEHICLE SERVICING DUE">
-                  <a href={whatsappLinks.service} target="_blank" rel="noopener noreferrer">
-                    <Car className="h-4 w-4 text-amber-600" />
-                  </a>
-                </Button>
-                <Button variant="ghost" size="icon" asChild title="VEHICLE INSPECTION DUE">
-                  <a href={whatsappLinks.inspection} target="_blank" rel="noopener noreferrer">
-                    <Shield className="h-4 w-4 text-sky-600" />
-                  </a>
-                </Button>
-              </>
-            )}
-
             <Button
               variant="ghost"
               size="icon"
-              title="Delete"
-              onClick={() => {
-                if (confirm("Are you sure want to delete?")) {
-                  startTransition(async () => {
-                    const r = await deleteVehicleAction(vehicle.vehicle_id);
-                    toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage);
-                    router.refresh();
-                  });
-                }
-              }}
+              className="h-8 w-8 shrink-0"
+              asChild
+              title="Fuel"
             >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-
-            <Button variant="ghost" size="icon" asChild title="fuel">
               <Link href={`/vehicles/${vehicle.vehicle_id}/fuel`}>
                 <Fuel className="h-4 w-4 text-primary" />
               </Link>
             </Button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  title="More actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>WhatsApp Messages</DropdownMenuLabel>
+                {whatsappLinks ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={whatsappLinks.addQuota}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cursor-pointer"
+                      >
+                        <Fuel className="mr-2 h-4 w-4" />
+                        Addl. Quota Sanction
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={whatsappLinks.service}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cursor-pointer"
+                      >
+                        <Car className="mr-2 h-4 w-4 text-amber-600" />
+                        Vehicle Servicing Due
+                      </a>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <a
+                        href={whatsappLinks.inspection}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="cursor-pointer"
+                      >
+                        <Shield className="mr-2 h-4 w-4 text-sky-600" />
+                        Vehicle Inspection Due
+                      </a>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem disabled>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Officer not assigned
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => {
+                    if (!confirm("Are you sure want to delete?")) return;
+                    startTransition(async () => {
+                      const r = await deleteVehicleAction(vehicle.vehicle_id);
+                      toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage);
+                      router.refresh();
+                    });
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Vehicle
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
@@ -349,7 +412,23 @@ export function VehiclesClient({
           <VehicleForm />
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={vehicles} searchKey="registration_no" />
+      <DataTable
+        columns={columns}
+        data={vehicles}
+        searchKey="registration_no"
+        showSerialNumber
+        exportConfig={{
+          title: "Vehicles",
+          fileName: "vehicles",
+          columns: [
+            { header: "Vehicle Make Type", getValue: (r) => r.make_type_name },
+            { header: "Vehicle Variant", getValue: (r) => r.variant_name },
+            { header: "Registration Number", getValue: (r) => r.registration_no },
+            { header: "Vehicle Model Year", getValue: (r) => r.model_year },
+            { header: "PS", getValue: (r) => r.ps_name },
+          ],
+        }}
+      />
       {edit && (
         <CrudDialog
           title="Edit Vehicle"

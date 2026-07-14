@@ -1,10 +1,23 @@
 import { NextResponse } from "next/server";
 import { verifyToken, COOKIE_NAME } from "@/lib/auth/jwt";
+import { SESSION_HEADER } from "@/lib/auth/session";
+import type { JWTPayload } from "@/lib/types";
 import type { NextRequest } from "next/server";
 
 const publicPaths = ["/login", "/api/auth/login"];
 const apiCronPaths = ["/api/cron"];
 const qrStockCookieName = "mto_qr_stock_access";
+
+function nextWithSession(request: NextRequest, session: JWTPayload | null) {
+  const requestHeaders = new Headers(request.headers);
+  if (session) {
+    requestHeaders.set(
+      SESSION_HEADER,
+      Buffer.from(JSON.stringify(session)).toString("base64")
+    );
+  }
+  return NextResponse.next({ request: { headers: requestHeaders } });
+}
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -38,7 +51,7 @@ export async function middleware(request: NextRequest) {
     if (session && pathname === "/login") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
-    return NextResponse.next();
+    return nextWithSession(request, session);
   }
 
   const isQrStockRoute =
@@ -46,11 +59,11 @@ export async function middleware(request: NextRequest) {
   const hasQrAccess = request.cookies.get(qrStockCookieName)?.value === "1";
 
   if (!session && isQrStockRoute && hasQrAccess) {
-    return NextResponse.next();
+    return nextWithSession(request, null);
   }
 
   if (!session && isQrStockRoute) {
-    return NextResponse.next();
+    return nextWithSession(request, null);
   }
 
   if (!session) {
@@ -59,7 +72,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  return nextWithSession(request, session);
 }
 
 export const config = {

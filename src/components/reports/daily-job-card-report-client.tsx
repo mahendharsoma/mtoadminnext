@@ -198,7 +198,7 @@ export function DailyJobCardReportClient({
           data={rows}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Daily Job Card Report" exportFileName="daily-job-card-report"/>
       </CardContent>
     </Card>
   );

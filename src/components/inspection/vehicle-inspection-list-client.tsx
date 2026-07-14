@@ -87,7 +87,7 @@ export function VehicleInspectionListClient({
                 data={inspections}
                 searchKey="general_number"
                 searchPlaceholder="Search:"
-              />
+               exportTitle="Vehicle Inspection" exportFileName="vehicle-inspection"/>
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 No inspection records found for this vehicle.

@@ -118,7 +118,7 @@ export function DriverAllotmentClient({
         </CrudDialog>
       </PageHeader>
 
-      <DataTable columns={columns} data={drivers} searchKey="driver_name" searchPlaceholder="Search:" />
+      <DataTable columns={columns} data={drivers} searchKey="driver_name" searchPlaceholder="Search:"  exportTitle="Driver Vehicle Allotment" exportFileName="driver-vehicle-allotment"/>
 
       {reassign && (
         <CrudDialog

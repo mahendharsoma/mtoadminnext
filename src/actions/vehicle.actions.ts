@@ -215,10 +215,25 @@ const vehicleFuelSchema = z.object({
   liters: z.string().min(1),
 });
 
+/** Normalize DB/form dates to YYYY-MM-DD for reliable comparison. */
+function toDateOnly(value?: string | null): string {
+  if (!value) return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const d = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function computeMileage(previousReading: number, currentReading: number, liters: string): string {
   const litersNum = Number(liters);
-  if (!litersNum || litersNum <= 0) return "0";
-  return String((currentReading - previousReading) / litersNum);
+  const distance = currentReading - previousReading;
+  if (!litersNum || litersNum <= 0 || distance <= 0) return "0.00";
+  return (distance / litersNum).toFixed(2);
 }
 
 export async function createVehicleFuelAction(formData: FormData) {
@@ -236,25 +251,43 @@ export async function createVehicleFuelAction(formData: FormData) {
   }
 
   const data = parsed.data;
-  const previousFillingDate = (formData.get("previous_filling_date") as string | null)?.trim();
+  const fillingDate = toDateOnly(data.filling_date);
+  if (!fillingDate) {
+    return failureResponse("Invalid filling date");
+  }
 
-  if (previousFillingDate && previousFillingDate > data.filling_date) {
-    return failureResponse("You have to enter greater than the previous filling date");
+  // Always verify against the latest fuel record for this vehicle (not only form field)
+  const lastFuel = await vehicleRepository.getLastVehicleFuelByVehicleId(data.vehicle_id);
+  const lastFillingDate = toDateOnly(lastFuel?.filling_date);
+
+  // Previous meter: 0 for first fill, else last record's current reading
+  const previousReading = lastFuel
+    ? Number(lastFuel.current_reading ?? 0)
+    : 0;
+
+  if (lastFillingDate && fillingDate < lastFillingDate) {
+    return failureResponse(
+      `Filling date must be greater than or equal to the last fuel filled date (${lastFillingDate})`
+    );
   }
 
   if (Number(data.liters) <= 0) {
     return failureResponse("Liters must be greater than zero");
   }
 
-  if (data.current_reading <= data.previous_reading) {
+  if (data.current_reading <= previousReading) {
     return failureResponse("Current Reading Must be greater than Previous Reading");
   }
 
-  const mileage = computeMileage(data.previous_reading, data.current_reading, data.liters);
+  const mileage = computeMileage(previousReading, data.current_reading, data.liters);
 
   try {
     await vehicleRepository.createVehicleFuel({
-      ...data,
+      vehicle_id: data.vehicle_id,
+      filling_date: fillingDate,
+      previous_reading: previousReading,
+      current_reading: data.current_reading,
+      liters: data.liters,
       mileage,
       created_by: session.userId,
       created_on: getCurrentDateTimeForDb(),
@@ -290,6 +323,31 @@ export async function updateVehicleFuelAction(formData: FormData) {
   }
 
   const data = parsed.data;
+  const fillingDate = toDateOnly(data.filling_date);
+  if (!fillingDate) {
+    return failureResponse("Invalid filling date");
+  }
+
+  // When updating, date must be >= previous record's filling date (if any)
+  const previousFuel = await vehicleRepository.getPreviousVehicleFuelRecord(
+    existing.vehicle_id,
+    id
+  );
+  const previousFillingDate = toDateOnly(previousFuel?.filling_date);
+  if (previousFillingDate && fillingDate < previousFillingDate) {
+    return failureResponse(
+      `Filling date must be greater than or equal to the last fuel filled date (${previousFillingDate})`
+    );
+  }
+
+  // And must not be after the next record's filling date (if any)
+  const nextFuel = await vehicleRepository.getNextVehicleFuelRecord(existing.vehicle_id, id);
+  const nextFillingDate = toDateOnly(nextFuel?.filling_date);
+  if (nextFillingDate && fillingDate > nextFillingDate) {
+    return failureResponse(
+      `Filling date must be less than or equal to the next fuel filled date (${nextFillingDate})`
+    );
+  }
 
   if (Number(data.liters) <= 0) {
     return failureResponse("Liters must be greater than zero");
@@ -313,7 +371,7 @@ export async function updateVehicleFuelAction(formData: FormData) {
 
   try {
     await vehicleRepository.updateVehicleFuel(id, {
-      filling_date: data.filling_date,
+      filling_date: fillingDate,
       previous_reading: data.previous_reading,
       current_reading: data.current_reading,
       liters: data.liters,

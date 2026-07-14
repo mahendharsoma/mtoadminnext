@@ -538,7 +538,7 @@ export function LubricantVoucherItemsClient({
           <CardTitle className="text-base">Voucher Items</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable columns={itemColumns} data={items} searchKey="lubricant_name" />
+          <DataTable columns={itemColumns} data={items} searchKey="lubricant_name" exportTitle="Lubricant Voucher Items" exportFileName="lubricant-voucher-items" />
         </CardContent>
       </Card>
 
@@ -552,7 +552,7 @@ export function LubricantVoucherItemsClient({
             </Button>
           </CardHeader>
           <CardContent>
-            <DataTable columns={containerColumns} data={containers} searchKey="barcode" />
+            <DataTable columns={containerColumns} data={containers} searchKey="barcode" exportTitle="Lubricant Containers" exportFileName="lubricant-containers" />
           </CardContent>
         </Card>
       )}

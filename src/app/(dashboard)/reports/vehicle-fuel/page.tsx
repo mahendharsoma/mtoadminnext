@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { VehicleFuelReportClient } from "@/components/reports/vehicle-fuel-report-client";
 import { PageHeader } from "@/components/shared/page-header";
@@ -9,7 +10,19 @@ function getDefaultMonthValue(): string {
   return `${now.getFullYear()}-${month}`;
 }
 
-export default async function VehicleFuelReportPage({
+export default function VehicleFuelReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <VehicleFuelReportPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function VehicleFuelReportPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;

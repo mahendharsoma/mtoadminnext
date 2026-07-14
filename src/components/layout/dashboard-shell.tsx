@@ -5,8 +5,6 @@ import { cn } from "@/lib/utils";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TopNav } from "@/components/layout/top-nav";
 import { NavigationProgress } from "@/components/layout/navigation-progress";
-import { NavigationPending } from "@/components/layout/navigation-pending";
-import { PageTransition } from "@/components/motion/page-transition";
 import type { JWTPayload } from "@/lib/types";
 
 export function DashboardShell({
@@ -42,11 +40,7 @@ export function DashboardShell({
           onSidebarToggle={() => setTabletCollapsed((c) => !c)}
           showSidebarToggle
         />
-        <main className="flex-1 p-4 md:p-6 lg:p-8">
-          <NavigationPending>
-            <PageTransition>{children}</PageTransition>
-          </NavigationPending>
-        </main>
+        <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
       </div>
     </div>
   );

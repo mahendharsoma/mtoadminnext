@@ -82,7 +82,7 @@ export function VehicleTypesClient({ types }: { types: VehicleType[] }) {
           </div>
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={types} searchKey="vehicle_type_name" searchPlaceholder="Search:" />
+      <DataTable columns={columns} data={types} searchKey="vehicle_type_name" searchPlaceholder="Search:"  exportTitle="Vehicle Types" exportFileName="vehicle-types"/>
       {edit && (
         <CrudDialog
           title="Edit Vehicle Type"
@@ -189,7 +189,7 @@ export function InspectionTitlesClient({
               <Button onClick={() => setAddOpen(true)}>Add Inspection Title</Button>
             </div>
             {titles.length > 0 ? (
-              <DataTable columns={columns} data={titles} />
+              <DataTable columns={columns} data={titles} exportTitle="Inspection Titles" exportFileName="inspection-titles" />
             ) : (
               <p className="text-sm text-muted-foreground py-4">
                 No inspection titles found for this vehicle type.
@@ -372,7 +372,7 @@ export function LubricantsClient({
               <Button type="submit" size="sm">Add</Button>
             </form>
             <div className="mt-4">
-              <DataTable columns={typeColumns} data={types} searchKey="lubricant_type_name" />
+              <DataTable columns={typeColumns} data={types} searchKey="lubricant_type_name" exportTitle="Lubricant Types" exportFileName="lubricant-types" />
             </div>
           </CardContent>
         </Card>
@@ -384,7 +384,7 @@ export function LubricantsClient({
               <Button type="submit" size="sm">Add</Button>
             </form>
             <div className="mt-4">
-              <DataTable columns={gradeColumns} data={grades} searchKey="lubricant_grade_name" />
+              <DataTable columns={gradeColumns} data={grades} searchKey="lubricant_grade_name" exportTitle="Lubricant Grades" exportFileName="lubricant-grades" />
             </div>
           </CardContent>
         </Card>
@@ -469,7 +469,7 @@ export function LubricantsClient({
           </div>
         </CrudDialog>
       )}
-      <DataTable columns={columns} data={lubricants} searchKey="lubricant_name" />
+      <DataTable columns={columns} data={lubricants} searchKey="lubricant_name" exportTitle="Lubricants" exportFileName="lubricants" />
     </div>
   );
 }
@@ -487,7 +487,7 @@ export function LubricantInventoryClient({ inventory }: { inventory: RowDataPack
   return (
     <div>
       <PageHeader title="Lubricant Inventory" description="Current lubricant stock in liters" />
-      <DataTable columns={columns} data={inventory} searchKey="lubricant_name" />
+      <DataTable columns={columns} data={inventory} searchKey="lubricant_name" exportTitle="Lubricant Inventory" exportFileName="lubricant-inventory" />
     </div>
   );
 }

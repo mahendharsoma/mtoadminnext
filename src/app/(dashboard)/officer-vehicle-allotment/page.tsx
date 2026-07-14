@@ -1,9 +1,22 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { psRepository } from "@/lib/db/repositories/ps.repository";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { allotmentRepository } from "@/lib/db/repositories/allotment.repository";
 import { OfficerAllotmentClient } from "@/components/ps/officer-allotment-client";
 
-export default async function OfficerVehicleAllotmentPage({
+export default function OfficerVehicleAllotmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ps_id?: string; vehicle_id?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <OfficerVehicleAllotmentPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function OfficerVehicleAllotmentPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ ps_id?: string; vehicle_id?: string }>;

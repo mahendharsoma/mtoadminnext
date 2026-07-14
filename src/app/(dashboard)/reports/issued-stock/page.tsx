@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { inventoryRepository } from "@/lib/db/repositories/inventory.repository";
@@ -16,7 +17,24 @@ function getDefaultFromDate(): string {
   return formatDateInput(date);
 }
 
-export default async function IssuedStockReportPage({
+export default function IssuedStockReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    from?: string;
+    to?: string;
+    variant_id?: string;
+    item_name_id?: string;
+  }>;
+}) {
+  return (
+    <StreamPage>
+      <IssuedStockReportPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function IssuedStockReportPageContent({
   searchParams,
 }: {
   searchParams: Promise<{

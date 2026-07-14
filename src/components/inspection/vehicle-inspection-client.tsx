@@ -53,7 +53,7 @@ export function VehicleInspectionClient({
           <p>PS: {vehicle.ps_name || "—"}</p>
         </CardContent>
       </Card>
-      <DataTable columns={columns} data={inspections} searchKey="general_number" />
+      <DataTable columns={columns} data={inspections} searchKey="general_number" exportTitle="Vehicle Inspections" exportFileName="vehicle-inspections" />
     </div>
   );
 }

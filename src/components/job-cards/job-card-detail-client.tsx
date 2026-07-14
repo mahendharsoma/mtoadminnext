@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -96,6 +96,7 @@ export function JobCardDetailClient({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [jobTypeId, setJobTypeId] = useState(String(jobCard.job_type_id ?? ""));
+  const [serviceTypeId, setServiceTypeId] = useState(String(jobCard.service_type_id ?? ""));
   const [oilLubricantId, setOilLubricantId] = useState("");
   const [oilQuantity, setOilQuantity] = useState("");
   const [editOil, setEditOil] = useState<JobCardOil | null>(null);
@@ -122,9 +123,18 @@ export function JobCardDetailClient({
 
   const [spareState, setSpareState] = useState<SparePartRowState>(initialSpareState);
 
+  useEffect(() => {
+    setSpareState(initialSpareState);
+  }, [initialSpareState]);
+
+  useEffect(() => {
+    setServiceTypeId(String(jobCard.service_type_id ?? ""));
+  }, [jobCard.service_type_id]);
+
   const isActive = jobCard.job_card_status === "Active";
   const isApproved = jobCard.job_card_status === "Approve";
   const isOutsideJob = Number(jobTypeId) === 2;
+  const showInspectionFields = Number(serviceTypeId) === 5;
   const canEditSpareParts = !["Close", "Rejected"].includes(jobCard.job_card_status);
 
   const whatsappLink = useMemo(() => {
@@ -153,16 +163,38 @@ export function JobCardDetailClient({
   }
 
   function saveSpareParts() {
-    const items = Object.entries(spareState)
-      .filter(([, row]) => row.checked && row.quantity)
-      .map(([, row]) => ({
-        item_id: row.item_name_id,
-        quantity: Number(row.quantity),
-        is_common: row.is_common,
-      }));
+    const selectedRows = Object.entries(spareState).filter(([, row]) => row.checked);
+
+    if (selectedRows.length === 0) {
+      toast.error("Select at least one item to assign");
+      return;
+    }
+
+    for (const [, row] of selectedRows) {
+      const qty = Number(row.quantity);
+      if (!qty || qty <= 0) {
+        toast.error("Please enter valid quantity for all selected items");
+        return;
+      }
+    }
+
+    const items = selectedRows.map(([, row]) => ({
+      item_id: row.item_name_id,
+      quantity: Number(row.quantity),
+      is_common: row.is_common,
+    }));
 
     startTransition(async () => {
       const result = await assignJobCardItemsAction(jobCard.job_card_id, items);
+      toast[result.statusCode === 200 ? "success" : "error"](result.statusMessage);
+      if (result.refreshPage) router.refresh();
+    });
+  }
+
+  function clearSpareParts() {
+    if (!confirm("Remove all assigned items from this job card?")) return;
+    startTransition(async () => {
+      const result = await assignJobCardItemsAction(jobCard.job_card_id, []);
       toast[result.statusCode === 200 ? "success" : "error"](result.statusMessage);
       if (result.refreshPage) router.refresh();
     });
@@ -273,46 +305,51 @@ export function JobCardDetailClient({
               <div className="space-y-2">
                 <Label>Select Service Type</Label>
                 <select
-                  disabled
-                  value={String(jobCard.service_type_id ?? "")}
-                  className="flex h-10 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm"
+                  name="service_type_id"
+                  value={serviceTypeId}
+                  onChange={(e) => setServiceTypeId(e.target.value)}
+                  disabled={!isActive && !isApproved}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:bg-muted"
                 >
                   <option value="" disabled>
                     Select Service Type
                   </option>
                   {Object.entries(SERVICE_TYPES).map(([key, label]) => (
-                    <option key={key} value={key}>
+                    <option key={key} value={key} data-id={key}>
                       {label}
                     </option>
                   ))}
                 </select>
-                <input type="hidden" name="service_type_id" value={jobCard.service_type_id ?? ""} />
               </div>
-              <div className="space-y-2">
-                <Label>Inspected By</Label>
-                <Input value={inspection?.inspected_by ?? ""} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Inspected On</Label>
-                <Input
-                  type="date"
-                  value={formatDateForInput(inspection?.inspected_on)}
-                  readOnly
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>General Number</Label>
-                <Input value={inspection?.general_number ?? ""} readOnly />
-              </div>
-              <div className="space-y-2">
-                <Label>Comment</Label>
-                <textarea
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm"
-                  value={inspection?.comment ?? ""}
-                  readOnly
-                  rows={3}
-                />
-              </div>
+              {showInspectionFields && (
+                <>
+                  <div className="space-y-2 inspection_fields">
+                    <Label>Inspected By</Label>
+                    <Input value={inspection?.inspected_by ?? ""} readOnly />
+                  </div>
+                  <div className="space-y-2 inspection_fields">
+                    <Label>Inspected On</Label>
+                    <Input
+                      type="date"
+                      value={formatDateForInput(inspection?.inspected_on)}
+                      readOnly
+                    />
+                  </div>
+                  <div className="space-y-2 inspection_fields">
+                    <Label>General Number</Label>
+                    <Input value={inspection?.general_number ?? ""} readOnly />
+                  </div>
+                  <div className="space-y-2 inspection_fields md:col-span-2">
+                    <Label>Comment</Label>
+                    <textarea
+                      className="flex min-h-[80px] w-full rounded-md border border-input bg-muted px-3 py-2 text-sm"
+                      value={inspection?.comment ?? ""}
+                      readOnly
+                      rows={3}
+                    />
+                  </div>
+                </>
+              )}
               <div className="space-y-2">
                 <Label>KMR*</Label>
                 <Input
@@ -447,14 +484,29 @@ export function JobCardDetailClient({
         </CardContent>
       </Card>
 
-      {spareParts.length > 0 && (
+      {spareParts.length > 0 ? (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Spare Parts</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle>Assign Items</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Select items, enter quantity, then click Assign Items (same as CI4 approve items).
+              </p>
+            </div>
             {canEditSpareParts && (
-              <Button size="sm" onClick={saveSpareParts} disabled={isPending}>
-                Save
-              </Button>
+              <div className="flex shrink-0 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={clearSpareParts}
+                  disabled={isPending}
+                >
+                  Clear All
+                </Button>
+                <Button size="sm" onClick={saveSpareParts} disabled={isPending}>
+                  Assign Items
+                </Button>
+              </div>
             )}
           </CardHeader>
           <CardContent>
@@ -493,15 +545,17 @@ export function JobCardDetailClient({
                             placeholder="Quantity"
                             value={row.quantity}
                             disabled={!canEditSpareParts}
-                            onChange={(e) =>
+                            onChange={(e) => {
+                              const qty = e.target.value;
                               setSpareState((prev) => ({
                                 ...prev,
                                 [rowKey]: {
                                   ...row,
-                                  quantity: e.target.value,
+                                  quantity: qty,
+                                  checked: qty !== "" ? true : row.checked,
                                 },
-                              }))
-                            }
+                              }));
+                            }}
                           />
                         ) : (
                           <span className="text-center block text-muted-foreground">
@@ -536,6 +590,55 @@ export function JobCardDetailClient({
                 })}
               </tbody>
             </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Assign Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              No spare parts available in inventory for this vehicle.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {assignedItems.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Assigned Items</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="p-3 text-left">S.No</th>
+                    <th className="p-3 text-left">Item Name</th>
+                    <th className="p-3 text-left">Type</th>
+                    <th className="p-3 text-left">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assignedItems.map((item, index) => (
+                    <tr key={item.job_card_item_id} className="border-b">
+                      <td className="p-3">{index + 1}</td>
+                      <td className="p-3">{item.item_name ?? `Item #${item.item_name_id}`}</td>
+                      <td className="p-3">
+                        {Number(item.is_common) === 1 ? (
+                          <Badge variant="secondary">Common</Badge>
+                        ) : (
+                          "Vehicle Specific"
+                        )}
+                      </td>
+                      <td className="p-3">{item.item_quantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </CardContent>
         </Card>

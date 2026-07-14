@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { InspectionTitleReportClient } from "@/components/reports/inspection-title-report-client";
 import type { InspectionTitleReportRow } from "@/lib/types";
@@ -8,7 +9,19 @@ function getDefaultMonthValue(): string {
   return `${now.getFullYear()}-${month}`;
 }
 
-export default async function InspectionTitleReportPage({
+export default function InspectionTitleReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <InspectionTitleReportPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function InspectionTitleReportPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;

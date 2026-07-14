@@ -9,12 +9,14 @@ interface StockRow extends RowDataPacket {
   make_type_id: number | null;
   variant_id: number | null;
   item_name_id: number;
+  is_common: number;
   make_type_name: string | null;
   variant_name: string | null;
   item_name: string;
   total_sanctioned_quantity: number;
-  total_pending_quantity: number;
-  total_received_quantity: number;
+  pending_quantity: number;
+  master_total_quantity: number;
+  received_quantity: number;
   available_quantity: number;
 }
 
@@ -39,7 +41,7 @@ export class InventoryRepository extends BaseRepository {
   // Item Names
   async getAllItemNames(): Promise<ItemName[]> {
     return this.selectAll<ItemName>(
-      `SELECT * FROM ${TABLES.ITEM_NAME} ORDER BY item_name`
+      `SELECT * FROM ${TABLES.ITEM_NAME} ORDER BY item_name_id DESC`
     );
   }
 
@@ -84,7 +86,7 @@ export class InventoryRepository extends BaseRepository {
   // Vendors
   async getAllVendors(): Promise<Vendor[]> {
     return this.selectAll<Vendor>(
-      `SELECT * FROM ${TABLES.VENDORS} ORDER BY vendor_name`
+      `SELECT * FROM ${TABLES.VENDORS} ORDER BY vendor_id DESC`
     );
   }
 
@@ -102,10 +104,17 @@ export class InventoryRepository extends BaseRepository {
   }
 
   async updateVendor(id: number, data: Record<string, unknown>): Promise<void> {
-    const fields = Object.keys(data).map((k) => `${k} = ?`).join(", ");
     await this.executeUpdate(
-      `UPDATE ${TABLES.VENDORS} SET ${fields} WHERE vendor_id = ?`,
-      this.buildParams([...Object.values(data), id])
+      `UPDATE ${TABLES.VENDORS}
+       SET vendor_name = ?, vendor_phone = ?, updated_by = ?, updated_on = ?
+       WHERE vendor_id = ?`,
+      this.buildParams([
+        data.vendor_name,
+        data.vendor_phone,
+        data.updated_by,
+        data.updated_on,
+        id,
+      ])
     );
   }
 
@@ -260,6 +269,14 @@ export class InventoryRepository extends BaseRepository {
     );
   }
 
+  async countItemsByBulkItemId(bulkItemsId: number): Promise<number> {
+    const row = await this.selectOne<RowDataPacket>(
+      `SELECT COUNT(*) AS total FROM ${TABLES.ITEM_INVENTORY} WHERE bulk_items_id = ?`,
+      [bulkItemsId]
+    );
+    return Number(row?.total ?? 0);
+  }
+
   async insertItemTransaction(data: Record<string, unknown>): Promise<number> {
     return this.insertRecord(
       `INSERT INTO ${TABLES.ITEM_TRANSACTION}
@@ -308,14 +325,17 @@ export class InventoryRepository extends BaseRepository {
   }
 
   async insertMainInventory(data: Record<string, unknown>): Promise<number> {
+    // Columns are NOT NULL — common parts must use 0, never SQL NULL
+    const makeTypeId = Number(data.make_type_id ?? 0);
+    const variantId = Number(data.variant_id ?? 0);
     return this.insertRecord(
       `INSERT INTO ${TABLES.INVENTORY}
        (bulk_items_id, make_type_id, variant_id, item_name_id, is_common, total_quantity, available_quantity, item_price, status, created_by, created_on)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       this.buildParams([
         data.bulk_items_id,
-        data.make_type_id ?? null,
-        data.variant_id ?? null,
+        Number.isFinite(makeTypeId) ? makeTypeId : 0,
+        Number.isFinite(variantId) ? variantId : 0,
         data.item_name_id,
         data.is_common ?? 0,
         data.total_quantity,
@@ -337,14 +357,16 @@ export class InventoryRepository extends BaseRepository {
   }
 
   async insertSingleItem(data: Record<string, unknown>): Promise<number> {
+    const makeTypeId = Number(data.make_type_id ?? 0);
+    const variantId = Number(data.variant_id ?? 0);
     return this.insertRecord(
       `INSERT INTO ${TABLES.ITEM_INVENTORY}
        (bulk_items_id, make_type_id, variant_id, item_name_id, is_common, item_price, status, created_by, created_on)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       this.buildParams([
         data.bulk_items_id,
-        data.make_type_id ?? null,
-        data.variant_id ?? null,
+        Number.isFinite(makeTypeId) ? makeTypeId : 0,
+        Number.isFinite(variantId) ? variantId : 0,
         data.item_name_id,
         data.is_common ?? 0,
         data.item_price,
@@ -355,24 +377,130 @@ export class InventoryRepository extends BaseRepository {
     );
   }
 
-  // Stock
+  async updateItemBarcode(
+    itemInventoryId: number,
+    data: {
+      barcode_number: string;
+      barcode_image: string;
+      make_type_id: number;
+      variant_id: number;
+      item_name_id: number;
+      updated_by: number;
+      updated_on: string;
+    }
+  ): Promise<void> {
+    const makeTypeId = Number.isFinite(data.make_type_id) ? data.make_type_id : 0;
+    const variantId = Number.isFinite(data.variant_id) ? data.variant_id : 0;
+    await this.executeUpdate(
+      `UPDATE ${TABLES.ITEM_INVENTORY}
+       SET barcode_number = ?,
+           barcode_image = ?,
+           make_type_id = ?,
+           variant_id = ?,
+           item_name_id = ?,
+           updated_by = ?,
+           updated_on = ?
+       WHERE item_inventory_id = ?`,
+      [
+        data.barcode_number,
+        data.barcode_image,
+        makeTypeId,
+        variantId,
+        data.item_name_id,
+        data.updated_by,
+        data.updated_on,
+        itemInventoryId,
+      ]
+    );
+  }
+
+  async getItemInventoryById(itemInventoryId: number): Promise<RowDataPacket | null> {
+    return this.selectOne<RowDataPacket>(
+      `SELECT * FROM ${TABLES.ITEM_INVENTORY} WHERE item_inventory_id = ?`,
+      [itemInventoryId]
+    );
+  }
+
+  async isItemInventoryAllocated(itemInventoryId: number): Promise<boolean> {
+    const row = await this.selectOne<RowDataPacket>(
+      `SELECT vehicle_allocated_item_id
+       FROM ${TABLES.VEHICLE_ALLOCATED_ITEMS}
+       WHERE item_inventory_id = ?
+       LIMIT 1`,
+      [itemInventoryId]
+    );
+    return Boolean(row);
+  }
+
+  async deleteItemInventoryById(itemInventoryId: number): Promise<void> {
+    await this.executeDelete(
+      `DELETE FROM ${TABLES.ITEM_INVENTORY} WHERE item_inventory_id = ?`,
+      [itemInventoryId]
+    );
+  }
+
+  async getItemsByBulkItemId(bulkItemsId: number): Promise<RowDataPacket[]> {
+    return this.selectAll<RowDataPacket>(
+      `SELECT ii.*,
+              m.make_type AS make_type_name,
+              vv.variant_name,
+              iname.item_name
+       FROM ${TABLES.ITEM_INVENTORY} ii
+       LEFT JOIN ${TABLES.VEHICLE_MAKE_TYPE} m ON m.make_type_id = ii.make_type_id
+       LEFT JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = ii.variant_id
+       LEFT JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = ii.item_name_id
+       WHERE ii.bulk_items_id = ?
+       ORDER BY ii.item_inventory_id DESC`,
+      [bulkItemsId]
+    );
+  }
+
+  async getBulkItemDetails(bulkItemsId: number): Promise<BulkItemRow | null> {
+    return this.selectOne<BulkItemRow>(
+      `SELECT bi.*,
+              m.make_type AS make_type_name,
+              vv.variant_name,
+              iname.item_name,
+              COALESCE(
+                (SELECT COUNT(*)
+                 FROM ${TABLES.ITEM_INVENTORY} ii
+                 WHERE ii.bulk_items_id = bi.bulk_items_id),
+                0
+              ) AS received_quantity
+       FROM ${TABLES.BULK_ITEMS} bi
+       LEFT JOIN ${TABLES.VEHICLE_MAKE_TYPE} m ON m.make_type_id = bi.make_type_id
+       LEFT JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = bi.variant_id
+       LEFT JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = bi.item_name_id
+       WHERE bi.bulk_items_id = ?`,
+      [bulkItemsId]
+    );
+  }
+
+  // Stock — mirrors CI4 Inventory_management_library::get_total_stock()
   async getTotalStock(
     makeTypeId?: number | null,
     variantId?: number | null,
     itemNameId?: number | null
   ): Promise<StockRow[]> {
+    const i = TABLES.INVENTORY;
+    const m = TABLES.VEHICLE_MAKE_TYPE;
+    const vv = TABLES.VEHICLE_VARIANT;
+    const iname = TABLES.ITEM_NAME;
+    const bi = TABLES.BULK_ITEMS;
+    const it = TABLES.ITEM_TRANSACTION;
+
     const where: string[] = [];
     const params: Array<number> = [];
     if (makeTypeId) {
-      where.push("i.make_type_id = ?");
+      where.push(`i.make_type_id = ?`);
       params.push(makeTypeId);
     }
     if (variantId) {
-      where.push("i.variant_id = ?");
+      where.push(`i.variant_id = ?`);
       params.push(variantId);
     }
     if (itemNameId) {
-      where.push("i.item_name_id = ?");
+      where.push(`i.item_name_id = ?`);
       params.push(itemNameId);
     }
     const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
@@ -380,29 +508,96 @@ export class InventoryRepository extends BaseRepository {
     return this.selectAll<StockRow>(
       `SELECT
          i.inventory_id,
-         i.make_type_id,
-         i.variant_id,
-         i.item_name_id,
+         i.available_quantity,
+         i.total_quantity AS master_total_quantity,
+         i.is_common,
+         m.make_type_id,
          m.make_type AS make_type_name,
+         vv.variant_id,
          vv.variant_name,
+         iname.item_name_id,
          iname.item_name,
-         COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0) AS total_sanctioned_quantity,
-         COALESCE(it.received_quantity, COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0)) AS total_received_quantity,
-         GREATEST(
-           COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0) -
-           COALESCE(it.received_quantity, COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0)),
-           0
-         ) AS total_pending_quantity,
-         i.available_quantity
-       FROM ${TABLES.INVENTORY} i
-       LEFT JOIN ${TABLES.BULK_ITEMS} bi ON bi.bulk_items_id = i.bulk_items_id
-       LEFT JOIN ${TABLES.ITEM_TRANSACTION} it ON it.bulk_items_id = i.bulk_items_id
-       LEFT JOIN ${TABLES.VEHICLE_MAKE_TYPE} m ON m.make_type_id = i.make_type_id
-       LEFT JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = i.variant_id
-       LEFT JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = i.item_name_id
+         CASE
+           WHEN i.is_common = 1 THEN (
+             SELECT COALESCE(SUM(total_quantity), 0)
+             FROM ${bi}
+             WHERE is_common = 1
+               AND item_name_id = i.item_name_id
+           )
+           ELSE (
+             SELECT COALESCE(SUM(total_quantity), 0)
+             FROM ${bi}
+             WHERE make_type_id = i.make_type_id
+               AND variant_id = i.variant_id
+               AND item_name_id = i.item_name_id
+               AND is_common = 0
+           )
+         END AS total_sanctioned_quantity,
+         CASE
+           WHEN i.is_common = 1 THEN (
+             (
+               SELECT COALESCE(SUM(total_quantity), 0)
+               FROM ${bi}
+               WHERE is_common = 1
+                 AND item_name_id = i.item_name_id
+             )
+             -
+             (
+               SELECT COALESCE(SUM(received_quantity), 0)
+               FROM ${it} tx
+               JOIN ${bi} bulk ON bulk.bulk_items_id = tx.bulk_items_id
+               WHERE bulk.is_common = 1
+                 AND bulk.item_name_id = i.item_name_id
+             )
+           )
+           ELSE (
+             (
+               SELECT COALESCE(SUM(total_quantity), 0)
+               FROM ${bi}
+               WHERE make_type_id = i.make_type_id
+                 AND variant_id = i.variant_id
+                 AND item_name_id = i.item_name_id
+                 AND is_common = 0
+             )
+             -
+             (
+               SELECT COALESCE(SUM(received_quantity), 0)
+               FROM ${it} tx
+               JOIN ${bi} bulk ON bulk.bulk_items_id = tx.bulk_items_id
+               WHERE bulk.make_type_id = i.make_type_id
+                 AND bulk.variant_id = i.variant_id
+                 AND bulk.item_name_id = i.item_name_id
+                 AND bulk.is_common = 0
+             )
+           )
+         END AS pending_quantity,
+         (
+           CASE
+             WHEN i.is_common = 1 THEN (
+               SELECT COALESCE(SUM(received_quantity), 0)
+               FROM ${it} tx
+               JOIN ${bi} bulk ON bulk.bulk_items_id = tx.bulk_items_id
+               WHERE bulk.is_common = 1
+                 AND bulk.item_name_id = i.item_name_id
+             )
+             ELSE (
+               SELECT COALESCE(SUM(received_quantity), 0)
+               FROM ${it} tx
+               JOIN ${bi} bulk ON bulk.bulk_items_id = tx.bulk_items_id
+               WHERE bulk.make_type_id = i.make_type_id
+                 AND bulk.variant_id = i.variant_id
+                 AND bulk.item_name_id = i.item_name_id
+                 AND bulk.is_common = 0
+             )
+           END
+         ) AS received_quantity
+       FROM ${i} i
+       LEFT JOIN ${m} m ON m.make_type_id = i.make_type_id
+       LEFT JOIN ${vv} vv ON vv.variant_id = i.variant_id
+       LEFT JOIN ${iname} iname ON iname.item_name_id = i.item_name_id
        ${whereSql}
-       ORDER BY iname.item_name`
-      ,
+       GROUP BY i.inventory_id, m.make_type_id, vv.variant_id, iname.item_name_id
+       ORDER BY iname.item_name`,
       params
     );
   }

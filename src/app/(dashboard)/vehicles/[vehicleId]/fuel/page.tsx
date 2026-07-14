@@ -1,8 +1,21 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { notFound } from "next/navigation";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { VehicleFuelClient } from "@/components/vehicles/vehicle-fuel-client";
 
-export default async function VehicleFuelPage({
+export default function VehicleFuelPage({
+  params,
+}: {
+  params: Promise<{ vehicleId: string }>;
+}) {
+  return (
+    <StreamPage>
+      <VehicleFuelPageContent params={params} />
+    </StreamPage>
+  );
+}
+
+async function VehicleFuelPageContent({
   params,
 }: {
   params: Promise<{ vehicleId: string }>;

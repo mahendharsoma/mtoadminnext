@@ -1,9 +1,22 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { inventoryRepository } from "@/lib/db/repositories/inventory.repository";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { VoucherItemsClient } from "@/components/inventory/voucher-items-client";
 import { notFound } from "next/navigation";
 
-export default async function VoucherItemsPage({
+export default function VoucherItemsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <StreamPage>
+      <VoucherItemsPageContent params={params} />
+    </StreamPage>
+  );
+}
+
+async function VoucherItemsPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;

@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { ReportPageClient } from "@/components/reports/report-client";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -10,7 +11,15 @@ const columns: ColumnDef<RowDataPacket>[] = [
   { accessorKey: "liters_available", header: "Available (L)" },
 ];
 
-export default async function LubricantInventoryReportPage() {
+export default function LubricantInventoryReportPage() {
+  return (
+    <StreamPage>
+      <LubricantInventoryReportPageContent />
+    </StreamPage>
+  );
+}
+
+async function LubricantInventoryReportPageContent() {
   const data = await reportsRepository.getLubricantInventoryReport();
   return (
     <ReportPageClient

@@ -1,8 +1,21 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { CondemnationReportClient } from "@/components/reports/condemnation-report-client";
 import type { CondemnationReportRow } from "@/lib/types";
 
-export default async function CondemnationReportPage({
+export default function CondemnationReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <CondemnationReportPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function CondemnationReportPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;

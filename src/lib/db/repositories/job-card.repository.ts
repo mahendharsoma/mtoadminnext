@@ -126,7 +126,11 @@ export class JobCardRepository extends BaseRepository {
 
   async getAssignedItems(jobCardId: number): Promise<JobCardAssignedItem[]> {
     return this.selectAll<JobCardAssignedItem>(
-      `SELECT * FROM ${TABLES.JOB_CARD_ITEMS} WHERE job_card_id = ?`,
+      `SELECT jci.*, iname.item_name
+       FROM ${TABLES.JOB_CARD_ITEMS} jci
+       LEFT JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = jci.item_name_id
+       WHERE jci.job_card_id = ?
+       ORDER BY jci.job_card_item_id`,
       [jobCardId]
     );
   }

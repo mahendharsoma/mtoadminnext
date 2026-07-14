@@ -4,6 +4,7 @@ import type {
   CondemnationReportRow,
   DashboardStats,
   IssuedStockReportRow,
+  OfficerVehicleAllotmentReportRow,
   StockReportRow,
   VehicleOverallServiceReportRow,
 } from "@/lib/types";
@@ -163,89 +164,75 @@ export class ReportsRepository extends BaseRepository {
     );
   }
 
+  /** Mirrors CI4 Reports_library::get_stock_report_details() */
   async getStockReport(): Promise<StockReportRow[]> {
     return this.selectAll<StockReportRow>(
       `SELECT
-         i.inventory_id,
-         i.make_type_id,
-         i.variant_id,
-         i.item_name_id,
+         i.total_quantity,
+         i.available_quantity,
          i.is_common,
-         m.make_type AS make_type,
+         m.make_type_id,
+         m.make_type,
+         vv.variant_id,
          vv.variant_name,
-         iname.item_name,
-         COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0) AS total_sanctioned_quantity,
-         GREATEST(
-           COALESCE(CAST(bi.total_quantity AS SIGNED), i.total_quantity, 0) -
-           COALESCE(txn.received_quantity, 0),
-           0
-         ) AS pending_quantity,
-         COALESCE(txn.received_quantity, 0) AS received_quantity,
-         i.available_quantity
+         iname.item_name_id,
+         iname.item_name
        FROM ${TABLES.INVENTORY} i
-       LEFT JOIN ${TABLES.BULK_ITEMS} bi ON bi.bulk_items_id = i.bulk_items_id
-       LEFT JOIN (
-         SELECT bulk_items_id, SUM(received_quantity) AS received_quantity
-         FROM ${TABLES.ITEM_TRANSACTION}
-         GROUP BY bulk_items_id
-       ) txn ON txn.bulk_items_id = i.bulk_items_id
        LEFT JOIN ${TABLES.VEHICLE_MAKE_TYPE} m ON m.make_type_id = i.make_type_id
        LEFT JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = i.variant_id
-       LEFT JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = i.item_name_id
+       JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = i.item_name_id
        ORDER BY iname.item_name`
     );
   }
 
+  /** Mirrors CI4 Reports_library::get_issued_stock_report() — one row per issued item */
   async getIssuedStockReport(
     fromDate: string,
     toDate: string,
     variantId?: number,
     itemNameId?: number
   ): Promise<IssuedStockReportRow[]> {
-    const params: Array<string | number> = [fromDate, toDate];
-    let filters = "";
+    const params: Array<string | number> = [];
+    const where: string[] = [];
 
+    if (fromDate) {
+      where.push(`DATE(vai.created_on) >= ?`);
+      params.push(fromDate);
+    }
+    if (toDate) {
+      where.push(`DATE(vai.created_on) <= ?`);
+      params.push(toDate);
+    }
     if (variantId) {
-      filters += ` AND vai.variant_id = ?`;
+      where.push(`vai.variant_id = ?`);
       params.push(variantId);
     }
     if (itemNameId) {
-      filters += ` AND vai.item_name_id = ?`;
+      where.push(`vai.item_name_id = ?`);
       params.push(itemNameId);
     }
 
+    const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
     return this.selectAll<IssuedStockReportRow>(
-      `SELECT DATE(vai.created_on) AS issued_date,
-              MAX(vai.created_on) AS created_on,
-              vai.make_type_id,
-              vai.variant_id,
-              vai.item_name_id,
+      `SELECT vai.*,
+              DATE(vai.created_on) AS issued_date,
               mt.make_type,
               vv.variant_name,
               iname.item_name,
               jc.vehicle_id,
               v.registration_no,
-              MAX(ii.is_common) AS is_common,
-              COUNT(*) AS total_issued_stock
+              ii.is_common,
+              ii.barcode_number
        FROM ${TABLES.VEHICLE_ALLOCATED_ITEMS} vai
-       JOIN ${TABLES.VEHICLE_MAKE_TYPE} mt ON mt.make_type_id = vai.make_type_id
-       JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = vai.variant_id
+       LEFT JOIN ${TABLES.VEHICLE_MAKE_TYPE} mt ON mt.make_type_id = vai.make_type_id
+       LEFT JOIN ${TABLES.VEHICLE_VARIANT} vv ON vv.variant_id = vai.variant_id
        JOIN ${TABLES.ITEM_NAME} iname ON iname.item_name_id = vai.item_name_id
        JOIN ${TABLES.JOB_CARD} jc ON jc.job_card_id = vai.job_card_id
        JOIN ${TABLES.VEHICLES} v ON v.vehicle_id = jc.vehicle_id
        JOIN ${TABLES.ITEM_INVENTORY} ii ON ii.item_inventory_id = vai.item_inventory_id
-       WHERE DATE(vai.created_on) >= ?
-         AND DATE(vai.created_on) <= ?${filters}
-       GROUP BY DATE(vai.created_on),
-                jc.vehicle_id,
-                v.registration_no,
-                vai.make_type_id,
-                vai.variant_id,
-                vai.item_name_id,
-                mt.make_type,
-                vv.variant_name,
-                iname.item_name
-       ORDER BY iname.item_name ASC, DATE(vai.created_on) ASC`,
+       ${whereSql}
+       ORDER BY iname.item_name ASC, vai.created_on DESC`,
       params
     );
   }
@@ -289,7 +276,8 @@ export class ReportsRepository extends BaseRepository {
     );
   }
 
-  async getOfficerVehicleAllotmentReport(): Promise<RowDataPacket[]> {
+  /** Mirrors CI4 Reports_library::get_officer_vehicle_allotment_report() */
+  async getOfficerVehicleAllotmentReport(): Promise<OfficerVehicleAllotmentReportRow[]> {
     const v = TABLES.VEHICLES;
     const mt = TABLES.VEHICLE_MAKE_TYPE;
     const vv = TABLES.VEHICLE_VARIANT;
@@ -298,10 +286,15 @@ export class ReportsRepository extends BaseRepository {
     const o = TABLES.OFFICERS;
     const ps = TABLES.POLICE_STATION;
 
-    return this.selectAll(
-      `SELECT v.vehicle_id, v.registration_no, v.model_year,
-              mt.make_type, vv.variant_name,
-              ovm.officer_id, ps.ps_name,
+    return this.selectAll<OfficerVehicleAllotmentReportRow>(
+      `SELECT v.vehicle_id,
+              v.registration_no,
+              v.model_year,
+              v.ps_id,
+              mt.make_type,
+              vv.variant_name,
+              ovm.officer_id,
+              ps.ps_name,
               officer.officer_name,
               GROUP_CONCAT(DISTINCT driver.officer_name ORDER BY driver.officer_name SEPARATOR ', ') AS driver_names
        FROM ${v} v
@@ -312,8 +305,7 @@ export class ReportsRepository extends BaseRepository {
        LEFT JOIN ${o} officer ON officer.officer_id = ovm.officer_id
        LEFT JOIN ${o} driver ON driver.officer_id = dvm.driver_id
        LEFT JOIN ${ps} ps ON ps.ps_id = v.ps_id
-       GROUP BY v.vehicle_id, v.registration_no, v.model_year, mt.make_type, vv.variant_name,
-                ovm.officer_id, ps.ps_name, officer.officer_name
+       GROUP BY v.vehicle_id
        ORDER BY v.vehicle_id DESC`
     );
   }

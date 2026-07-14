@@ -116,7 +116,7 @@ export function CondemnationReportClient({
           data={rows}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Condemnation Report" exportFileName="condemnation-report"/>
       </CardContent>
     </Card>
   );

@@ -3,12 +3,31 @@ import { TABLES } from "@/lib/constants";
 import type { CountRow } from "@/lib/db/types";
 import type { VehicleMakeType, VehicleVariant, Vehicle, VehicleFuelEntry } from "@/lib/types";
 
+function dedupeVehiclesById(vehicles: Vehicle[]): Vehicle[] {
+  const byId = new Map<number, Vehicle>();
+  for (const vehicle of vehicles) {
+    const existing = byId.get(vehicle.vehicle_id);
+    if (!existing) {
+      byId.set(vehicle.vehicle_id, vehicle);
+      continue;
+    }
+    if (!existing.officer_mobile && vehicle.officer_mobile) {
+      byId.set(vehicle.vehicle_id, {
+        ...existing,
+        officer_name: vehicle.officer_name,
+        officer_mobile: vehicle.officer_mobile,
+      });
+    }
+  }
+  return Array.from(byId.values());
+}
+
 export class VehicleRepository extends BaseRepository {
   // Make Types
   async getAllMakeTypes(): Promise<VehicleMakeType[]> {
     return this.selectAll<VehicleMakeType>(
       `SELECT make_type_id, make_type AS make_type_name, status, created_by, created_on, updated_by, updated_on
-       FROM ${TABLES.VEHICLE_MAKE_TYPE} ORDER BY make_type`
+       FROM ${TABLES.VEHICLE_MAKE_TYPE} ORDER BY make_type_id DESC`
     );
   }
 
@@ -113,7 +132,7 @@ export class VehicleRepository extends BaseRepository {
   }
 
   async getAllVehicles(): Promise<Vehicle[]> {
-    return this.selectAll<Vehicle>(
+    const rows = await this.selectAll<Vehicle>(
       `SELECT v.*,
               m.make_type AS make_type_name,
               vv.variant_name,
@@ -128,6 +147,7 @@ export class VehicleRepository extends BaseRepository {
        LEFT JOIN ${TABLES.OFFICERS} o ON o.officer_id = ovm.officer_id
        ORDER BY v.vehicle_id DESC`
     );
+    return dedupeVehiclesById(rows);
   }
 
   async getVehicleById(id: number): Promise<Vehicle | null> {
@@ -247,6 +267,48 @@ export class VehicleRepository extends BaseRepository {
       [vehicleId, vehicleFuelId]
     );
     return row !== null;
+  }
+
+  async getPreviousVehicleFuelRecord(
+    vehicleId: number,
+    vehicleFuelId: number
+  ): Promise<VehicleFuelEntry | null> {
+    return this.selectOne<VehicleFuelEntry>(
+      `SELECT vehicle_fuel_id,
+              vehicle_id,
+              filling_date,
+              previous_reading,
+              current_reading,
+              liters,
+              mileage
+       FROM ${TABLES.VEHICLE_FUEL}
+       WHERE vehicle_id = ?
+         AND vehicle_fuel_id < ?
+       ORDER BY vehicle_fuel_id DESC
+       LIMIT 1`,
+      [vehicleId, vehicleFuelId]
+    );
+  }
+
+  async getNextVehicleFuelRecord(
+    vehicleId: number,
+    vehicleFuelId: number
+  ): Promise<VehicleFuelEntry | null> {
+    return this.selectOne<VehicleFuelEntry>(
+      `SELECT vehicle_fuel_id,
+              vehicle_id,
+              filling_date,
+              previous_reading,
+              current_reading,
+              liters,
+              mileage
+       FROM ${TABLES.VEHICLE_FUEL}
+       WHERE vehicle_id = ?
+         AND vehicle_fuel_id > ?
+       ORDER BY vehicle_fuel_id ASC
+       LIMIT 1`,
+      [vehicleId, vehicleFuelId]
+    );
   }
 
   async createVehicleFuel(data: {

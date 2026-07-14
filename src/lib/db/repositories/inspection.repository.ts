@@ -115,6 +115,60 @@ export class InspectionRepository extends BaseRepository {
       [month, year]
     );
   }
+
+  /** Mirrors CI4 Inspections_library::get_data_by_month_year.
+   * Falls back to inspected_on when created_on is zero/invalid (common in this DB).
+   */
+  async getInspectionReportByMonthYear(
+    month: number,
+    year: number
+  ): Promise<Inspection[]> {
+    const rows = await this.selectAll<Inspection>(
+      `SELECT i.inspection_id,
+              i.job_card_id,
+              i.vehicle_id,
+              i.inspected_by,
+              i.inspected_on,
+              i.general_number,
+              i.comment,
+              i.created_on,
+              v.registration_no
+       FROM ${TABLES.INSPECTIONS} i
+       LEFT JOIN ${TABLES.VEHICLES} v ON v.vehicle_id = i.vehicle_id
+       WHERE MONTH(
+               COALESCE(
+                 NULLIF(NULLIF(CAST(i.created_on AS CHAR), '0000-00-00 00:00:00'), '0000-00-00'),
+                 i.inspected_on
+               )
+             ) = ?
+         AND YEAR(
+               COALESCE(
+                 NULLIF(NULLIF(CAST(i.created_on AS CHAR), '0000-00-00 00:00:00'), '0000-00-00'),
+                 i.inspected_on
+               )
+             ) = ?
+       ORDER BY i.inspection_id DESC`,
+      [month, year]
+    );
+
+    // Ensure Client Components never receive Invalid Date objects
+    return rows.map((row) => ({
+      ...row,
+      inspected_on: sanitizeDbDate(row.inspected_on),
+      created_on: sanitizeDbDate(row.created_on),
+    }));
+  }
+}
+
+function sanitizeDbDate(value: unknown): string {
+  if (value == null || value === "") return "";
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+    return value.toISOString();
+  }
+  const text = String(value);
+  if (text.startsWith("0000-00-00") || text === "Invalid Date") return "";
+  return text;
 }
 
 export class LubricantRepository extends BaseRepository {

@@ -1,7 +1,16 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { lubricantRepository } from "@/lib/db/repositories/inspection.repository";
 import { LubricantsClient } from "@/components/misc/misc-clients";
 
-export default async function LubricantsPage() {
+export default function LubricantsPage() {
+  return (
+    <StreamPage>
+      <LubricantsPageContent />
+    </StreamPage>
+  );
+}
+
+async function LubricantsPageContent() {
   const [lubricants, types, grades] = await Promise.all([
     lubricantRepository.getAllLubricants(),
     lubricantRepository.getAllTypes(),

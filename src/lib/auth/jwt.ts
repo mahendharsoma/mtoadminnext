@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { JWTPayload } from "@/lib/types";
@@ -57,11 +58,13 @@ export async function getAuthToken(): Promise<string | undefined> {
   return cookieStore.get(COOKIE_NAME)?.value;
 }
 
-export async function getSession(): Promise<JWTPayload | null> {
+async function readSession(): Promise<JWTPayload | null> {
   const token = await getAuthToken();
   if (!token) return null;
   return verifyToken(token);
 }
+
+export const getSession = cache(readSession);
 
 export async function requireSession(): Promise<JWTPayload> {
   const session = await getSession();

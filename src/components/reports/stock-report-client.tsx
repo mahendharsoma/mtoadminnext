@@ -6,11 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { StockReportRow } from "@/lib/types";
 
 function getMakeLabel(row: StockReportRow): string {
-  return Number(row.is_common) === 1 ? "Common" : row.make_type || "NA";
+  if (Number(row.is_common) === 1 || Number(row.make_type_id) === 0) {
+    return "Common";
+  }
+  return row.make_type || "NA";
 }
 
 function getVariantLabel(row: StockReportRow): string {
-  return Number(row.is_common) === 1 ? "All Vehicles" : row.variant_name || "NA";
+  if (Number(row.is_common) === 1 || Number(row.variant_id) === 0) {
+    return "All Vehicles";
+  }
+  return row.variant_name || "NA";
 }
 
 const columns: ColumnDef<StockReportRow>[] = [
@@ -36,25 +42,14 @@ const columns: ColumnDef<StockReportRow>[] = [
     cell: ({ row }) => row.original.item_name || "—",
   },
   {
-    // CI4 view has this header, but the cell content is commented out.
-    id: "total_sanctioned_quantity",
-    header: "Total Sanctioned Quantity",
-    cell: () => "",
-  },
-  {
-    accessorKey: "pending_quantity",
-    header: "Total Pending Quantity",
-    cell: ({ row }) => row.original.pending_quantity ?? "",
-  },
-  {
-    accessorKey: "received_quantity",
-    header: "Total Received Quantity",
-    cell: ({ row }) => row.original.received_quantity ?? "",
+    accessorKey: "total_quantity",
+    header: "Total Quantity",
+    cell: ({ row }) => Number(row.original.total_quantity ?? 0),
   },
   {
     accessorKey: "available_quantity",
     header: "Available Quantity",
-    cell: ({ row }) => row.original.available_quantity ?? "",
+    cell: ({ row }) => Number(row.original.available_quantity ?? 0),
   },
 ];
 
@@ -70,6 +65,8 @@ export function StockReportClient({ rows }: { rows: StockReportRow[] }) {
           data={rows}
           searchKey="item_name"
           searchPlaceholder="Search:"
+          exportTitle="Stock Report"
+          exportFileName="stock-report"
         />
       </CardContent>
     </Card>

@@ -1,7 +1,20 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { inspectionRepository } from "@/lib/db/repositories/inspection.repository";
 import { InspectionTitlesClient } from "@/components/misc/misc-clients";
 
-export default async function InspectionTitlesPage({
+export default function InspectionTitlesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vehicle_type_id?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <InspectionTitlesPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function InspectionTitlesPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ vehicle_type_id?: string }>;

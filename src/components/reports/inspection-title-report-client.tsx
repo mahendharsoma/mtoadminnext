@@ -95,7 +95,7 @@ export function InspectionTitleReportClient({
           data={rows}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Inspection Title Report" exportFileName="inspection-title-report"/>
       </CardContent>
     </Card>
   );

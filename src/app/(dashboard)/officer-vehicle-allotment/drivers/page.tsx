@@ -1,9 +1,22 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { notFound, redirect } from "next/navigation";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { allotmentRepository } from "@/lib/db/repositories/allotment.repository";
 import { DriverAllotmentClient } from "@/components/ps/driver-allotment-client";
 
-export default async function DriverAllotmentPage({
+export default function DriverAllotmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ ps_id?: string; vehicle_id?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <DriverAllotmentPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function DriverAllotmentPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ ps_id?: string; vehicle_id?: string }>;

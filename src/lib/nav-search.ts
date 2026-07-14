@@ -17,6 +17,8 @@ export const searchNavItems: SearchNavItem[] = [
   { title: "Received Vouchers", href: "/received-voucher", group: "Inventory" },
   { title: "Stock", href: "/total-stock", group: "Inventory" },
   { title: "Inspections", href: "/inspection", group: "Inspections" },
+  { title: "Inspection Report", href: "/reports/inspection", group: "Reports" },
+  { title: "Officer Vehicle Allotment Report", href: "/reports/allotment", group: "Reports" },
   { title: "Daily Job Card Report", href: "/reports/daily-job-card", group: "Reports" },
   { title: "Stock Report", href: "/reports/stock", group: "Reports" },
   { title: "Vehicle Fuel Report", href: "/reports/vehicle-fuel", group: "Reports" },

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
@@ -101,8 +101,9 @@ const adminNavItems: NavItem[] = [
       { title: "Condemnation", href: "/reports/condemnation" },
       { title: "Stock Report", href: "/reports/stock" },
       { title: "Issued Stock", href: "/reports/issued-stock" },
-      { title: "Allotment Report", href: "/reports/allotment" },
+      { title: "Officer Vehicle Allotment Report", href: "/reports/allotment" },
       { title: "Inspection Title Report", href: "/reports/inspection-title" },
+      { title: "Inspection Report", href: "/reports/inspection" },
       { title: "Vehicle Fuel", href: "/reports/vehicle-fuel" },
     ],
   },
@@ -198,15 +199,18 @@ function NavLinkItem({
   pathname: string;
   collapsed: boolean;
 }) {
+  const router = useRouter();
   const isActive = isRouteActive(pathname, item.href!);
   const Icon = item.icon;
+  const href = item.href!;
 
   return (
     <motion.div variants={navItemVariants}>
       <motion.div whileHover={{ x: collapsed ? 0 : 3 }} transition={springSnappy}>
         <Link
-          href={item.href!}
+          href={href}
           prefetch
+          onMouseEnter={() => router.prefetch(href)}
           title={collapsed ? item.title : undefined}
           className={cn(
             "group relative flex items-center gap-3 overflow-hidden rounded-xl px-3 py-2.5 text-sm font-medium",
@@ -248,6 +252,7 @@ function NavGroupItem({
   pathname: string;
   collapsed: boolean;
 }) {
+  const router = useRouter();
   const isChildActive =
     item.children?.some((child) => isRouteActive(pathname, child.href)) ?? false;
   const [open, setOpen] = useState(false);
@@ -266,6 +271,7 @@ function NavGroupItem({
         <Link
           href={href}
           prefetch
+          onMouseEnter={() => router.prefetch(href)}
           title={item.title}
           className={cn(
             "group relative flex items-center justify-center rounded-xl px-2 py-2.5",
@@ -295,7 +301,7 @@ function NavGroupItem({
           type="button"
           onClick={() => setOpen((prev) => !prev)}
           className={cn(
-            "group relative flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-medium",
+            "group relative flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm font-medium md:py-2.5",
             isChildActive ? "text-white" : "text-sidebar-foreground/80"
           )}
         >
@@ -347,8 +353,9 @@ function NavGroupItem({
                       <Link
                         href={child.href}
                         prefetch
+                        onMouseEnter={() => router.prefetch(child.href)}
                         className={cn(
-                          "group relative my-0.5 flex items-center gap-2 rounded-lg px-3 py-2 text-sm",
+                          "group relative my-0.5 flex min-h-11 items-center gap-2 rounded-lg px-3 py-2.5 text-sm md:min-h-0 md:py-2",
                           childActive
                             ? "font-medium text-white"
                             : "text-sidebar-foreground/60"
@@ -432,25 +439,44 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const [isLargeScreen, setIsLargeScreen] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const update = () => setIsLargeScreen(mq.matches);
+    const lg = window.matchMedia("(min-width: 1024px)");
+    const mobile = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      setIsLargeScreen(lg.matches);
+      setIsMobile(mobile.matches);
+    };
     update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    lg.addEventListener("change", update);
+    mobile.addEventListener("change", update);
+    return () => {
+      lg.removeEventListener("change", update);
+      mobile.removeEventListener("change", update);
+    };
   }, []);
 
   useEffect(() => {
     onMobileOpenChange(false);
   }, [pathname, onMobileOpenChange]);
 
+  // Lock body scroll while mobile drawer is open
+  useEffect(() => {
+    if (!isMobile) return;
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen, isMobile]);
+
   const navItems =
     user.userRole === "Admin"
       ? adminNavItems
       : adminNavItems.filter((i) => i.title === "Dashboard" || i.title === "Inventory");
 
-  const isCollapsed = tabletCollapsed && !isLargeScreen;
+  // Icon-only collapse is tablet-only (md–lg). Mobile drawer must always show full labels + expandable groups.
+  const isCollapsed = tabletCollapsed && !isLargeScreen && !isMobile;
 
   return (
     <>
@@ -471,12 +497,13 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col border-r border-sidebar-border bg-sidebar",
+          "fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar",
           "transition-[transform,width] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
-          "w-64 -translate-x-full md:translate-x-0",
+          "w-72 -translate-x-full md:w-64 md:max-w-none md:translate-x-0",
           mobileOpen && "translate-x-0",
           isCollapsed ? "md:w-[4.5rem] lg:w-64" : "md:w-64"
         )}
+        aria-hidden={!mobileOpen && isMobile}
       >
         <motion.div
           initial={{ opacity: 0, y: -6 }}
@@ -495,12 +522,20 @@ export function Sidebar({
             <div className="absolute -inset-1 rounded-full bg-primary/20 blur-sm" />
             <BrandLogo size={36} className="relative rounded-lg" />
           </motion.div>
-          {(!isCollapsed || isLargeScreen) && (
-            <div className={cn("min-w-0", isCollapsed && "md:hidden lg:block")}>
+          {(!isCollapsed || isLargeScreen || isMobile) && (
+            <div className={cn("min-w-0 flex-1", isCollapsed && "md:hidden lg:block")}>
               <p className="truncate text-sm font-semibold tracking-wide text-white">MTO Command</p>
               <p className="truncate text-[11px] text-sidebar-foreground/55">Hyderabad Police</p>
             </div>
           )}
+          <button
+            type="button"
+            className="ml-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white md:hidden"
+            onClick={() => onMobileOpenChange(false)}
+            aria-label="Close menu"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
         </motion.div>
 
         <motion.button
@@ -527,7 +562,7 @@ export function Sidebar({
           variants={navListVariants}
           initial="hidden"
           animate="show"
-          className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden p-3 lg:p-4"
+          className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden overscroll-contain p-3 lg:p-4"
         >
           {navItems.map((item) => (
             <NavGroup key={item.title} item={item} pathname={pathname} collapsed={isCollapsed} />

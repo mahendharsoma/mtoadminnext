@@ -43,7 +43,14 @@ export function ReportPageClient({
           </form>
         )}
       </PageHeader>
-      <DataTable columns={columns} data={data} searchKey={searchKey} searchPlaceholder={searchPlaceholder} />
+      <DataTable
+        columns={columns}
+        data={data}
+        searchKey={searchKey}
+        searchPlaceholder={searchPlaceholder}
+        exportTitle={title}
+        exportFileName={title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}
+      />
     </div>
   );
 }

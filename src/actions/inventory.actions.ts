@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/auth/jwt";
 import { inventoryRepository } from "@/lib/db/repositories/inventory.repository";
 import { getCurrentDateTimeForDb } from "@/lib/utils";
 import { failureResponse, successResponse, INVENTORY_QR_PASSWORD } from "@/lib/constants";
+import { resolveInventoryMakeVariantIds } from "@/lib/inventory-utils";
 
 function isValidPhone(phone: string): boolean {
   return /^\d{10}$/.test(phone.trim());
@@ -107,8 +108,9 @@ export async function createVendorAction(formData: FormData) {
     });
     revalidatePath("/vendors");
     return successResponse(undefined, "Vendor created", { refreshPage: true });
-  } catch {
-    return failureResponse();
+  } catch (error) {
+    console.error("createVendorAction failed:", error);
+    return failureResponse("Unable to create vendor");
   }
 }
 
@@ -133,8 +135,9 @@ export async function updateVendorAction(formData: FormData) {
     });
     revalidatePath("/vendors");
     return successResponse(undefined, "Updated", { refreshPage: true });
-  } catch {
-    return failureResponse();
+  } catch (error) {
+    console.error("updateVendorAction failed:", error);
+    return failureResponse("Unable to update vendor");
   }
 }
 
@@ -339,26 +342,39 @@ export async function addBulkItemQuantityAction(formData: FormData) {
   const bulk = await inventoryRepository.getBulkItemById(bulkItemsId);
   if (!bulk) return failureResponse("Bulk item not found");
 
+  const isCommon = Number(bulk.is_common ?? 0) === 1 ? 1 : 0;
+  const { makeTypeId, variantId } = resolveInventoryMakeVariantIds(
+    isCommon,
+    bulk.make_type_id as number | null,
+    bulk.variant_id as number | null
+  );
+  const itemNameId = Number(bulk.item_name_id);
+
   const total = Number(bulk.total_quantity || 0);
   const tx = await inventoryRepository.getItemTransactionByBulkItemId(bulkItemsId);
-  const prevReceived = Number((tx?.received_quantity as number | undefined) ?? 0);
+  const actualReceived = await inventoryRepository.countItemsByBulkItemId(bulkItemsId);
+  const prevReceived = actualReceived;
   const pending = total - prevReceived;
   if (addQty > pending) {
-    return failureResponse("Unable to add item quantity, adding more than ordered quantity");
+    return failureResponse(
+      "Unable to Add Item Quantity, You are Adding more than the total quantity"
+    );
   }
 
   const nextReceived = prevReceived + addQty;
+  const now = getCurrentDateTimeForDb();
+  const hadTransaction = Boolean(tx?.item_transaction_id);
 
   try {
-    if (tx?.item_transaction_id) {
-      await inventoryRepository.updateItemTransaction(Number(tx.item_transaction_id), {
+    if (hadTransaction) {
+      await inventoryRepository.updateItemTransaction(Number(tx!.item_transaction_id), {
         total_quantity: total,
         received_quantity: nextReceived,
         added_item_quantity: addQty,
         item_price: itemPrice,
         received_date: receivedDate,
         updated_by: session.userId,
-        updated_on: getCurrentDateTimeForDb(),
+        updated_on: now,
       });
     } else {
       await inventoryRepository.insertItemTransaction({
@@ -366,62 +382,148 @@ export async function addBulkItemQuantityAction(formData: FormData) {
         total_quantity: total,
         received_quantity: nextReceived,
         added_item_quantity: addQty,
-        is_common: Number(bulk.is_common ?? 0),
+        is_common: isCommon,
         item_price: itemPrice,
         received_date: receivedDate,
         created_by: session.userId,
-        created_on: getCurrentDateTimeForDb(),
+        created_on: now,
       });
     }
 
     const mainInv = await inventoryRepository.getMainInventory(
-      (bulk.make_type_id as number | null) ?? null,
-      (bulk.variant_id as number | null) ?? null,
-      Number(bulk.item_name_id)
+      makeTypeId,
+      variantId,
+      itemNameId
     );
 
     if (mainInv?.inventory_id) {
       await inventoryRepository.updateMainInventory(Number(mainInv.inventory_id), {
         total_quantity: Number(mainInv.total_quantity) + addQty,
         available_quantity: Number(mainInv.available_quantity) + addQty,
-        item_price: itemPrice,
         updated_by: session.userId,
-        updated_on: getCurrentDateTimeForDb(),
+        updated_on: now,
       });
     } else {
       await inventoryRepository.insertMainInventory({
         bulk_items_id: bulkItemsId,
-        make_type_id: (bulk.make_type_id as number | null) ?? null,
-        variant_id: (bulk.variant_id as number | null) ?? null,
-        item_name_id: Number(bulk.item_name_id),
-        is_common: Number(bulk.is_common ?? 0),
+        make_type_id: makeTypeId,
+        variant_id: variantId,
+        item_name_id: itemNameId,
+        is_common: isCommon,
         total_quantity: addQty,
         available_quantity: addQty,
         item_price: itemPrice,
         status: "Active",
         created_by: session.userId,
-        created_on: getCurrentDateTimeForDb(),
+        created_on: now,
       });
     }
 
+    const { generateSequentialBarcode, generateBarcodeImage } = await import("@/lib/barcode");
+
     for (let i = 0; i < addQty; i += 1) {
-      await inventoryRepository.insertSingleItem({
+      const itemId = await inventoryRepository.insertSingleItem({
         bulk_items_id: bulkItemsId,
-        make_type_id: (bulk.make_type_id as number | null) ?? null,
-        variant_id: (bulk.variant_id as number | null) ?? null,
-        item_name_id: Number(bulk.item_name_id),
-        is_common: Number(bulk.is_common ?? 0),
+        make_type_id: makeTypeId,
+        variant_id: variantId,
+        item_name_id: itemNameId,
+        is_common: isCommon,
         item_price: itemPrice,
         status: "Active",
         created_by: session.userId,
-        created_on: getCurrentDateTimeForDb(),
+        created_on: now,
+      });
+
+      const barcodeNumber = generateSequentialBarcode(itemId);
+      const barcodeImage = await generateBarcodeImage(barcodeNumber);
+      await inventoryRepository.updateItemBarcode(itemId, {
+        barcode_number: barcodeNumber,
+        barcode_image: barcodeImage,
+        make_type_id: makeTypeId,
+        variant_id: variantId,
+        item_name_id: itemNameId,
+        updated_by: session.userId,
+        updated_on: now,
       });
     }
 
     revalidatePath(`/received-voucher/${bulk.received_voucher_id}/items`);
+    revalidatePath(`/add-items-quantity/${bulkItemsId}`);
     revalidatePath("/total-stock");
-    return successResponse(undefined, "Successfully Added Items", { refreshPage: true });
-  } catch {
-    return failureResponse("Unable to add item quantity, please try later");
+    return successResponse(
+      undefined,
+      hadTransaction ? "Successfully Updated Items" : "Successfully Added Items",
+      { refreshPage: true }
+    );
+  } catch (error) {
+    console.error("addBulkItemQuantityAction failed:", error);
+    return failureResponse("Unable to Add Items Quantity, please try later");
+  }
+}
+
+export async function deleteSingleBarcodeItemAction(formData: FormData) {
+  const session = await requireSession();
+  const itemInventoryId = Number(formData.get("item_inventory_id"));
+  const bulkItemsId = Number(formData.get("bulk_items_id"));
+  if (!itemInventoryId || !bulkItemsId) {
+    return failureResponse("Invalid item");
+  }
+
+  const item = await inventoryRepository.getItemInventoryById(itemInventoryId);
+  if (!item || Number(item.bulk_items_id) !== bulkItemsId) {
+    return failureResponse("Item not found");
+  }
+
+  if (await inventoryRepository.isItemInventoryAllocated(itemInventoryId)) {
+    return failureResponse("Cannot remove item — it is already allocated to a vehicle");
+  }
+
+  const bulk = await inventoryRepository.getBulkItemById(bulkItemsId);
+  if (!bulk) return failureResponse("Bulk item not found");
+
+  const isCommon = Number(bulk.is_common ?? 0) === 1 ? 1 : 0;
+  const { makeTypeId, variantId } = resolveInventoryMakeVariantIds(
+    isCommon,
+    bulk.make_type_id as number | null,
+    bulk.variant_id as number | null
+  );
+  const itemNameId = Number(bulk.item_name_id);
+  const now = getCurrentDateTimeForDb();
+
+  try {
+    await inventoryRepository.deleteItemInventoryById(itemInventoryId);
+
+    const tx = await inventoryRepository.getItemTransactionByBulkItemId(bulkItemsId);
+    if (tx?.item_transaction_id) {
+      const prevReceived = Number(tx.received_quantity ?? 0);
+      const nextReceived = Math.max(0, prevReceived - 1);
+      await inventoryRepository.updateItemTransaction(Number(tx.item_transaction_id), {
+        received_quantity: nextReceived,
+        updated_by: session.userId,
+        updated_on: now,
+      });
+    }
+
+    const mainInv = await inventoryRepository.getMainInventory(
+      makeTypeId,
+      variantId,
+      itemNameId
+    );
+    if (mainInv?.inventory_id) {
+      await inventoryRepository.updateMainInventory(Number(mainInv.inventory_id), {
+        total_quantity: Math.max(0, Number(mainInv.total_quantity) - 1),
+        available_quantity: Math.max(0, Number(mainInv.available_quantity) - 1),
+        updated_by: session.userId,
+        updated_on: now,
+      });
+    }
+
+    revalidatePath(`/received-voucher/${bulk.received_voucher_id}/items`);
+    revalidatePath(`/add-items-quantity/${bulkItemsId}`);
+    revalidatePath("/total-stock");
+    return successResponse(undefined, "Item removed successfully", { refreshPage: true });
+  } catch (error) {
+    console.error("deleteSingleBarcodeItemAction failed:", error);
+    return failureResponse("Unable to remove item, please try later");
   }
 }

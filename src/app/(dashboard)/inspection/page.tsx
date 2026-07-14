@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { inspectionRepository } from "@/lib/db/repositories/inspection.repository";
 import { InspectionListClient } from "@/components/inspection/inspection-list-client";
 
@@ -7,7 +8,19 @@ function getDefaultMonthValue(): string {
   return `${now.getFullYear()}-${month}`;
 }
 
-export default async function InspectionPage({
+export default function InspectionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <InspectionPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function InspectionPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ month?: string }>;

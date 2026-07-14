@@ -175,6 +175,7 @@ export interface JobCardAssignedItem extends RowDataPacket {
   job_card_item_id: number;
   job_card_id: number;
   item_name_id: number;
+  item_name?: string;
   item_quantity: number;
   is_common: number;
 }
@@ -266,6 +267,8 @@ export interface Inspection extends RowDataPacket {
   general_number: string;
   comment: string;
   registration_no?: string | null;
+  created_on?: string;
+  file?: string | null;
 }
 
 export interface InspectionTitleReportRow extends RowDataPacket {
@@ -346,33 +349,47 @@ export interface CondemnationReportRow extends RowDataPacket {
 }
 
 export interface StockReportRow extends RowDataPacket {
-  inventory_id: number;
   make_type_id: number | null;
   variant_id: number | null;
   item_name_id: number;
-  is_common: number;
+  is_common?: number;
   make_type: string | null;
   variant_name: string | null;
   item_name: string;
-  total_sanctioned_quantity: number | string;
-  pending_quantity: number | string;
-  received_quantity: number | string;
+  total_quantity: number | string;
   available_quantity: number | string;
 }
 
 export interface IssuedStockReportRow extends RowDataPacket {
-  issued_date: string;
-  created_on: string;
+  vehicle_allocated_items_id: number;
+  job_card_id: number;
+  item_inventory_id: number;
   make_type_id: number | null;
   variant_id: number | null;
   item_name_id: number;
+  status?: string | null;
+  created_on: string;
+  issued_date: string;
   make_type: string | null;
   variant_name: string | null;
   item_name: string | null;
   vehicle_id: number | null;
   registration_no: string | null;
   is_common: number | null;
-  total_issued_stock: number | string;
+  barcode_number?: string | null;
+}
+
+export interface OfficerVehicleAllotmentReportRow extends RowDataPacket {
+  vehicle_id: number;
+  registration_no: string | null;
+  model_year: string | null;
+  ps_id: number | null;
+  make_type: string | null;
+  variant_name: string | null;
+  officer_id: number | null;
+  ps_name: string | null;
+  officer_name: string | null;
+  driver_names: string | null;
 }
 
 export interface VehicleOverallServiceReportRow extends RowDataPacket {

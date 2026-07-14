@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Plus } from "lucide-react";
 import { DataTable } from "@/components/shared/data-table";
 import { PageHeader } from "@/components/shared/page-header";
 import { CrudDialog } from "@/components/shared/crud-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createBulkItemsBatchAction, addBulkItemQuantityAction } from "@/actions/inventory.actions";
+import { createBulkItemsBatchAction } from "@/actions/inventory.actions";
 import { getVariantsByMakeTypeAction } from "@/actions/vehicle.actions";
 import type { ItemName, VehicleMakeType, VehicleVariant } from "@/lib/types";
 import type { RowDataPacket } from "mysql2/promise";
@@ -76,18 +76,24 @@ export function VoucherItemsClient({
     {
       id: "add_quantity",
       header: "Add Quantity",
+      enableSorting: false,
       cell: ({ row }) => {
-        const pending = Number(row.original.total_quantity || 0) - Number(row.original.received_quantity || 0);
+        const pending =
+          Number(row.original.total_quantity || 0) - Number(row.original.received_quantity || 0);
+        if (pending <= 0) {
+          return (
+            <Button variant="outline" size="sm" disabled>
+              Fully Received
+            </Button>
+          );
+        }
         return (
-          <CrudDialog title="Add Item Quantity" onSubmit={addBulkItemQuantityAction} triggerLabel="Add Quantity">
-            <input type="hidden" name="bulk_items_id" value={row.original.bulk_items_id} />
-            <div className="space-y-2"><Label>Total Quantity</Label><Input value={row.original.total_quantity} readOnly /></div>
-            <div className="space-y-2"><Label>Received Quantity</Label><Input value={String(row.original.received_quantity ?? 0)} readOnly /></div>
-            <div className="space-y-2"><Label>Pending Quantity</Label><Input value={String(pending)} readOnly /></div>
-            <div className="space-y-2"><Label>Add Item Quantity</Label><Input name="add_item_quantity" type="number" min={1} max={pending} required /></div>
-            <div className="space-y-2"><Label>Item Price</Label><Input name="item_price" type="number" step="0.01" defaultValue={row.original.item_price ?? "0"} required /></div>
-            <div className="space-y-2"><Label>Received Date</Label><Input name="received_date" type="date" required /></div>
-          </CrudDialog>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/add-items-quantity/${row.original.bulk_items_id}`}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              Add Quantity
+            </Link>
+          </Button>
         );
       },
     },
@@ -175,7 +181,7 @@ export function VoucherItemsClient({
           />
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={bulkItems} searchKey="item_name" />
+      <DataTable columns={columns} data={bulkItems} searchKey="item_name" exportTitle="Voucher Items" exportFileName="voucher-items" />
     </div>
   );
 }

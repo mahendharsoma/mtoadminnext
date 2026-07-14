@@ -133,7 +133,7 @@ export function LubricantVoucherClient({
           </CrudDialog>
         </div>
       </PageHeader>
-      <DataTable columns={columns} data={vouchers} searchKey="voucher_no" />
+      <DataTable columns={columns} data={vouchers} searchKey="voucher_no"  exportTitle="Lubricant Receive Voucher" exportFileName="lubricant-receive-voucher"/>
       {edit && (
         <CrudDialog
           title="Edit Lubricant Receive Voucher"

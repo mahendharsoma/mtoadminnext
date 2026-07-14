@@ -1,8 +1,21 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { inspectionRepository } from "@/lib/db/repositories/inspection.repository";
 import { VehicleInspectionListClient } from "@/components/inspection/vehicle-inspection-list-client";
 
-export default async function VehicleInspectionPage({
+export default function VehicleInspectionPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ vehicle_id?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <VehicleInspectionPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function VehicleInspectionPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ vehicle_id?: string }>;

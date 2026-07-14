@@ -12,6 +12,7 @@ import { CrudDialog } from "@/components/shared/crud-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   createItemNameAction,
   updateItemNameAction,
@@ -31,13 +32,47 @@ export function ItemNamesClient({ items }: { items: ItemName[] }) {
 
   const columns: ColumnDef<ItemName>[] = [
     { accessorKey: "item_name", header: "Item Name" },
-    { accessorKey: "status", header: "Status" },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => (
+        <Badge variant={row.original.status === "Active" ? "success" : "destructive"}>
+          {row.original.status || "Active"}
+        </Badge>
+      ),
+    },
     {
       id: "actions",
+      header: "Actions",
+      enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete?")) startTransition(async () => { const r = await deleteItemNameAction(row.original.item_name_id); toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage); router.refresh(); }); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Edit"
+            onClick={() => setEdit(row.original)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Delete"
+            onClick={() => {
+              if (confirm("Delete this item name?")) {
+                startTransition(async () => {
+                  const r = await deleteItemNameAction(row.original.item_name_id);
+                  toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage);
+                  router.refresh();
+                });
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       ),
     },
@@ -47,14 +82,32 @@ export function ItemNamesClient({ items }: { items: ItemName[] }) {
     <div>
       <PageHeader title="Item Names" description="Spare parts master data">
         <CrudDialog title="Add Item Name" onSubmit={createItemNameAction}>
-          <div className="space-y-2"><Label>Item Name</Label><Input name="item_name" required /></div>
+          <div className="space-y-2">
+            <Label>Item Name</Label>
+            <Input name="item_name" required />
+          </div>
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={items} searchKey="item_name" />
+      <DataTable
+        columns={columns}
+        data={items}
+        searchKey="item_name"
+        exportTitle="Item Names"
+        exportFileName="item-names"
+      />
       {edit && (
-        <CrudDialog title="Edit Item" onSubmit={updateItemNameAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>
+        <CrudDialog
+          title="Edit Item"
+          onSubmit={updateItemNameAction}
+          open={!!edit}
+          onOpenChange={(o) => !o && setEdit(null)}
+          hideTrigger
+        >
           <input type="hidden" name="item_name_id" value={edit.item_name_id} />
-          <div className="space-y-2"><Label>Item Name</Label><Input name="item_name" defaultValue={edit.item_name} required /></div>
+          <div className="space-y-2">
+            <Label>Item Name</Label>
+            <Input name="item_name" defaultValue={edit.item_name} required />
+          </div>
         </CrudDialog>
       )}
     </div>
@@ -71,10 +124,36 @@ export function VendorsClient({ vendors }: { vendors: Vendor[] }) {
     { accessorKey: "vendor_phone", header: "Phone" },
     {
       id: "actions",
+      header: "Actions",
+      enableSorting: false,
       cell: ({ row }) => (
-        <div className="flex gap-1">
-          <Button variant="ghost" size="icon" onClick={() => setEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => { if (confirm("Delete?")) startTransition(async () => { const r = await deleteVendorAction(row.original.vendor_id); toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage); router.refresh(); }); }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Edit"
+            onClick={() => setEdit(row.original)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            title="Delete"
+            onClick={() => {
+              if (confirm("Delete this vendor?")) {
+                startTransition(async () => {
+                  const r = await deleteVendorAction(row.original.vendor_id);
+                  toast[r.statusCode === 200 ? "success" : "error"](r.statusMessage);
+                  router.refresh();
+                });
+              }
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       ),
     },
@@ -83,19 +162,45 @@ export function VendorsClient({ vendors }: { vendors: Vendor[] }) {
   const VendorForm = ({ item }: { item?: Vendor }) => (
     <>
       {item && <input type="hidden" name="vendor_id" value={item.vendor_id} />}
-      <div className="space-y-2"><Label>Vendor Name</Label><Input name="vendor_name" defaultValue={item?.vendor_name} required /></div>
-      <div className="space-y-2"><Label>Phone</Label><Input name="vendor_phone" defaultValue={item?.vendor_phone} required /></div>
+      <div className="space-y-2">
+        <Label>Vendor Name</Label>
+        <Input name="vendor_name" defaultValue={item?.vendor_name} required />
+      </div>
+      <div className="space-y-2">
+        <Label>Phone</Label>
+        <Input
+          name="vendor_phone"
+          defaultValue={item?.vendor_phone}
+          placeholder="10 digit mobile"
+          maxLength={10}
+          required
+        />
+      </div>
     </>
   );
 
   return (
     <div>
       <PageHeader title="Vendors" description="Supplier management">
-        <CrudDialog title="Add Vendor" onSubmit={createVendorAction}><VendorForm /></CrudDialog>
+        <CrudDialog title="Add Vendor" onSubmit={createVendorAction}>
+          <VendorForm />
+        </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={vendors} searchKey="vendor_name" />
+      <DataTable
+        columns={columns}
+        data={vendors}
+        searchKey="vendor_name"
+        exportTitle="Vendors"
+        exportFileName="vendors"
+      />
       {edit && (
-        <CrudDialog title="Edit Vendor" onSubmit={updateVendorAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>
+        <CrudDialog
+          title="Edit Vendor"
+          onSubmit={updateVendorAction}
+          open={!!edit}
+          onOpenChange={(o) => !o && setEdit(null)}
+          hideTrigger
+        >
           <VendorForm item={edit} />
         </CrudDialog>
       )}
@@ -169,7 +274,7 @@ export function ReceivedVoucherClient({
           <VoucherForm />
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={vouchers} searchKey="received_voucher" />
+      <DataTable columns={columns} data={vouchers} searchKey="received_voucher" exportTitle="Received Vouchers" exportFileName="received-vouchers" />
       {edit && (
         <CrudDialog title="Edit Voucher" onSubmit={updateReceivedVoucherAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>
           <VoucherForm item={edit} />

@@ -1,8 +1,21 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { jobCardRepository } from "@/lib/db/repositories/job-card.repository";
 import { PrintGatePassButton } from "@/components/job-cards/print-gate-pass-button";
 import { notFound } from "next/navigation";
 
-export default async function JobCardGatePassPage({
+export default function JobCardGatePassPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <StreamPage>
+      <JobCardGatePassPageContent params={params} />
+    </StreamPage>
+  );
+}
+
+async function JobCardGatePassPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;

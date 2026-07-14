@@ -170,7 +170,7 @@ export function VehicleOverallServiceReportClient({
             data={rows}
             searchKey="it_no"
             searchPlaceholder="Search:"
-          />
+           exportTitle="Vehicle Overall Service Report" exportFileName="vehicle-overall-service-report"/>
         ) : (
           <p className="text-sm text-muted-foreground">
             Select a vehicle and click Search to view overall service history.

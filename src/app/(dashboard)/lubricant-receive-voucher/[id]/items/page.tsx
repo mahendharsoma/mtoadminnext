@@ -1,8 +1,21 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { notFound } from "next/navigation";
 import { lubricantRepository } from "@/lib/db/repositories/inspection.repository";
 import { LubricantVoucherItemsClient } from "@/components/misc/lubricant-voucher-items-client";
 
-export default async function LubricantVoucherItemsPage({
+export default function LubricantVoucherItemsPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <StreamPage>
+      <LubricantVoucherItemsPageContent params={params} />
+    </StreamPage>
+  );
+}
+
+async function LubricantVoucherItemsPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;

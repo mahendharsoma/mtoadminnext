@@ -80,7 +80,7 @@ export function InspectionListClient({
           data={inspections}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Inspections" exportFileName="inspections"/>
       </CardContent>
     </Card>
   );

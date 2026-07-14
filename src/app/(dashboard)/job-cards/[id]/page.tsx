@@ -1,9 +1,22 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { jobCardRepository } from "@/lib/db/repositories/job-card.repository";
 import { lubricantRepository } from "@/lib/db/repositories/inspection.repository";
 import { JobCardDetailClient } from "@/components/job-cards/job-card-detail-client";
 import { notFound } from "next/navigation";
 
-export default async function JobCardDetailPage({
+export default function JobCardDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  return (
+    <StreamPage>
+      <JobCardDetailPageContent params={params} />
+    </StreamPage>
+  );
+}
+
+async function JobCardDetailPageContent({
   params,
 }: {
   params: Promise<{ id: string }>;

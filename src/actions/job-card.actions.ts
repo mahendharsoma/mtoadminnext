@@ -86,6 +86,12 @@ export async function assignJobCardItemsAction(
   const session = await requireSession();
   if (!jobCardId) return failureResponse("Invalid job card");
 
+  for (const item of items) {
+    if (!item.item_id || !item.quantity || item.quantity <= 0) {
+      return failureResponse("Please enter valid quantity for all selected items");
+    }
+  }
+
   try {
     const jobCard = await jobCardRepository.getById(jobCardId);
     if (!jobCard) return failureResponse("Unable to get Job card data");
@@ -96,11 +102,29 @@ export async function assignJobCardItemsAction(
       return failureResponse("Unable to Allocate Items, Job Card is Rejected");
     }
 
+    const spareParts = await jobCardRepository.getSparePartsForJobCard(jobCardId);
+    for (const item of items) {
+      const part = spareParts.find(
+        (p) =>
+          Number(p.item_name_id) === item.item_id &&
+          Number(p.is_common ?? 0) === Number(item.is_common)
+      );
+      if (!part) {
+        return failureResponse("Selected item is not available for this job card");
+      }
+      if (item.quantity > Number(part.available_quantity ?? 0)) {
+        return failureResponse(
+          `Quantity exceeds available stock for ${part.item_name ?? "item"}`
+        );
+      }
+    }
+
     const now = getCurrentDateTimeForDb();
     await jobCardRepository.replaceJobCardItems(jobCardId, items, session.userId, now);
     revalidateJobCard(jobCardId);
     return successResponse(undefined, "Successfully Approved Items", { refreshPage: true });
-  } catch {
+  } catch (error) {
+    console.error("assignJobCardItemsAction failed:", error);
     return failureResponse("Unable to Add Item, Please Try again later");
   }
 }

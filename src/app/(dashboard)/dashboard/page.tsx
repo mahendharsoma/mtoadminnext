@@ -1,5 +1,8 @@
+import dynamic from "next/dynamic";
+import { StreamPage } from "@/components/shared/stream-page";
 import { dashboardRepository } from "@/lib/db/repositories/dashboard.repository";
 import { PageHeader, StatCard } from "@/components/shared/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Car,
   ClipboardCheck,
@@ -9,9 +12,42 @@ import {
   FileText,
   Wrench,
 } from "lucide-react";
-import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 
-export default async function DashboardPage() {
+const DashboardCharts = dynamic(
+  () =>
+    import("@/components/dashboard/dashboard-charts").then((m) => ({
+      default: m.DashboardCharts,
+    })),
+  {
+    loading: () => (
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Skeleton className="h-72 w-full" />
+        <Skeleton className="h-72 w-full" />
+      </div>
+    ),
+  }
+);
+
+export default function DashboardPage() {
+  return (
+    <StreamPage
+      fallback={
+        <div className="space-y-8">
+          <Skeleton className="h-8 w-48" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-28 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      }
+    >
+      <DashboardPageContent />
+    </StreamPage>
+  );
+}
+
+async function DashboardPageContent() {
   const stats = await dashboardRepository.getStats();
 
   return (

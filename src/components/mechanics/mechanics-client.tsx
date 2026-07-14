@@ -90,7 +90,22 @@ export function MechanicsClient({ mechanics }: { mechanics: Mechanic[] }) {
           <Form />
         </CrudDialog>
       </PageHeader>
-      <DataTable columns={columns} data={mechanics} searchKey="mechanic_name" />
+      <DataTable
+        columns={columns}
+        data={mechanics}
+        searchKey="mechanic_name"
+        showSerialNumber
+        exportConfig={{
+          title: "Mechanics",
+          fileName: "mechanics",
+          columns: [
+            { header: "Name", getValue: (r) => r.mechanic_name },
+            { header: "General Number", getValue: (r) => r.general_number },
+            { header: "Phone", getValue: (r) => r.mechanic_phone },
+            { header: "Status", getValue: (r) => r.status },
+          ],
+        }}
+      />
       {editItem && (
         <CrudDialog title="Edit Mechanic" onSubmit={updateMechanicAction} open={!!editItem} onOpenChange={(o) => !o && setEditItem(null)} hideTrigger>
           <Form item={editItem} />

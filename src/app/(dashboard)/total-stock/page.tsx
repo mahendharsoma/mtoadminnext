@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { inventoryRepository } from "@/lib/db/repositories/inventory.repository";
 import { vehicleRepository } from "@/lib/db/repositories/vehicle.repository";
 import { StockClient } from "@/components/inventory/stock-client";
@@ -8,7 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export default async function TotalStockPage({
+export default function TotalStockPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return (
+    <StreamPage>
+      <TotalStockPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function TotalStockPageContent({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

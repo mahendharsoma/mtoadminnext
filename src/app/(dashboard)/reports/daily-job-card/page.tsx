@@ -1,3 +1,4 @@
+import { StreamPage } from "@/components/shared/stream-page";
 import { reportsRepository } from "@/lib/db/repositories/dashboard.repository";
 import { DailyJobCardReportClient } from "@/components/reports/daily-job-card-report-client";
 import type { DailyJobCardReportRow } from "@/lib/types";
@@ -15,7 +16,19 @@ function getDefaultFromDate(): string {
   return formatDateInput(date);
 }
 
-export default async function DailyJobCardReportPage({
+export default function DailyJobCardReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ from?: string; to?: string; service_type_id?: string }>;
+}) {
+  return (
+    <StreamPage>
+      <DailyJobCardReportPageContent searchParams={searchParams} />
+    </StreamPage>
+  );
+}
+
+async function DailyJobCardReportPageContent({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string; service_type_id?: string }>;

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const MotionDiv = motion.div;
 
 const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+  ({ className, children, ...props }, ref) => (
     <MotionDiv
       ref={ref}
       whileHover={{ y: -2, transition: { type: "spring", stiffness: 400, damping: 28 } }}
@@ -15,8 +15,16 @@ const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElemen
         "rounded-xl border border-border/80 bg-card text-card-foreground shadow-[var(--shadow-card)] transition-shadow duration-300 hover:shadow-[var(--shadow-elevated)]",
         className
       )}
-      {...props}
-    />
+      onClick={props.onClick}
+      onMouseEnter={props.onMouseEnter}
+      onMouseLeave={props.onMouseLeave}
+      id={props.id}
+      style={props.style}
+      role={props.role}
+      aria-label={props["aria-label"]}
+    >
+      {children}
+    </MotionDiv>
   )
 );
 Card.displayName = "Card";

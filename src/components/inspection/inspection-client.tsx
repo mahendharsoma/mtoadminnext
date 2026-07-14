@@ -27,7 +27,7 @@ export function InspectionVehiclesClient({ vehicles }: { vehicles: Vehicle[] }) 
   return (
     <div>
       <PageHeader title="Inspections by Vehicle" description="Select a vehicle to run inspection" />
-      <DataTable columns={columns} data={vehicles} searchKey="registration_no" />
+      <DataTable columns={columns} data={vehicles} searchKey="registration_no"  exportTitle="Inspections by Vehicle" exportFileName="inspections-by-vehicle"/>
     </div>
   );
 }

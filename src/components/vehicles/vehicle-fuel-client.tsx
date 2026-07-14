@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,9 +24,232 @@ function getKmTravelled(row: VehicleFuelEntry): number {
   return Number(row.current_reading ?? 0) - Number(row.previous_reading ?? 0);
 }
 
+function formatMileageDisplay(previous: number, current: number, liters: string): string {
+  const litersNum = Number(liters);
+  const distance = current - previous;
+  if (!litersNum || litersNum <= 0 || distance <= 0) return "—";
+  return `${(distance / litersNum).toFixed(2)} km/L`;
+}
+
 function toDateInputValue(value?: string | null): string {
   if (!value) return "";
-  return value.split("T")[0];
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return trimmed.slice(0, 10);
+  return trimmed.split("T")[0].split(" ")[0];
+}
+
+function FuelCalcPreview({
+  previousReading,
+  currentReading,
+  liters,
+}: {
+  previousReading: number;
+  currentReading: string;
+  liters: string;
+}) {
+  const current = Number(currentReading);
+  const distance =
+    Number.isFinite(current) && current > previousReading
+      ? current - previousReading
+      : 0;
+  const mileage = formatMileageDisplay(previousReading, current, liters);
+
+  return (
+    <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-1">
+      <p>
+        <span className="text-muted-foreground">KM Travelled: </span>
+        <strong>{distance > 0 ? distance : "—"}</strong>
+      </p>
+      <p>
+        <span className="text-muted-foreground">Mileage (auto): </span>
+        <strong>{mileage}</strong>
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Mileage = (Current − Previous) ÷ Liters
+      </p>
+    </div>
+  );
+}
+
+function AddFuelForm({
+  vehicleId,
+  previousReading,
+  lastFillingDate,
+  isFirstFill,
+}: {
+  vehicleId: number;
+  previousReading: number;
+  lastFillingDate: string;
+  isFirstFill: boolean;
+}) {
+  const [currentReading, setCurrentReading] = useState("");
+  const [liters, setLiters] = useState("");
+
+  return (
+    <>
+      <input type="hidden" name="vehicle_id" value={vehicleId} />
+      <input type="hidden" name="previous_reading" value={previousReading} />
+
+      <div className="space-y-2">
+        <Label>Filling Date</Label>
+        <Input
+          type="date"
+          name="filling_date"
+          min={lastFillingDate || undefined}
+          required
+        />
+        {lastFillingDate ? (
+          <p className="text-xs text-muted-foreground">
+            Must be on or after last filled date: {formatDateDdMmYyyy(lastFillingDate)}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Previous Meter Reading</Label>
+        <Input
+          type="number"
+          value={previousReading}
+          readOnly
+          className="bg-muted"
+        />
+        <p className="text-xs text-muted-foreground">
+          {isFirstFill
+            ? "First entry — previous reading starts at 0"
+            : "Taken automatically from last fill’s current reading"}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Current Meter Reading*</Label>
+        <Input
+          type="number"
+          name="current_reading"
+          min={previousReading + 0.0001}
+          step="any"
+          value={currentReading}
+          onChange={(e) => setCurrentReading(e.target.value)}
+          placeholder="Enter current meter reading"
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Fuel Quantity (Liters)*</Label>
+        <Input
+          type="number"
+          name="liters"
+          min={0.01}
+          step="any"
+          value={liters}
+          onChange={(e) => setLiters(e.target.value)}
+          placeholder="Enter liters filled"
+          required
+        />
+      </div>
+
+      <FuelCalcPreview
+        previousReading={previousReading}
+        currentReading={currentReading}
+        liters={liters}
+      />
+    </>
+  );
+}
+
+function EditFuelForm({
+  vehicleId,
+  item,
+  fuelEntries,
+}: {
+  vehicleId: number;
+  item: VehicleFuelEntry;
+  fuelEntries: VehicleFuelEntry[];
+}) {
+  const sortedAsc = useMemo(
+    () => [...fuelEntries].sort((a, b) => a.vehicle_fuel_id - b.vehicle_fuel_id),
+    [fuelEntries]
+  );
+  const idx = sortedAsc.findIndex((e) => e.vehicle_fuel_id === item.vehicle_fuel_id);
+  const prev = idx > 0 ? sortedAsc[idx - 1] : null;
+  const next = idx >= 0 && idx < sortedAsc.length - 1 ? sortedAsc[idx + 1] : null;
+  const minDate = toDateInputValue(prev?.filling_date);
+  const maxDate = toDateInputValue(next?.filling_date);
+  const previousReading = Number(item.previous_reading ?? 0);
+
+  const [currentReading, setCurrentReading] = useState(String(item.current_reading ?? ""));
+  const [liters, setLiters] = useState(String(item.liters ?? ""));
+
+  return (
+    <>
+      <input type="hidden" name="vehicle_id" value={vehicleId} />
+      <input type="hidden" name="vehicle_fuel_id" value={item.vehicle_fuel_id} />
+      <input type="hidden" name="previous_reading" value={previousReading} />
+
+      <div className="space-y-2">
+        <Label>Filling Date</Label>
+        <Input
+          type="date"
+          name="filling_date"
+          defaultValue={toDateInputValue(item.filling_date)}
+          min={minDate || undefined}
+          max={maxDate || undefined}
+          required
+        />
+        {(minDate || maxDate) && (
+          <p className="text-xs text-muted-foreground">
+            {minDate
+              ? `On or after previous: ${formatDateDdMmYyyy(minDate)}`
+              : null}
+            {minDate && maxDate ? " · " : null}
+            {maxDate ? `On or before next: ${formatDateDdMmYyyy(maxDate)}` : null}
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Previous Meter Reading</Label>
+        <Input
+          type="number"
+          value={previousReading}
+          readOnly
+          className="bg-muted"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Current Meter Reading*</Label>
+        <Input
+          type="number"
+          name="current_reading"
+          min={previousReading + 0.0001}
+          step="any"
+          value={currentReading}
+          onChange={(e) => setCurrentReading(e.target.value)}
+          required
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Fuel Quantity (Liters)*</Label>
+        <Input
+          type="number"
+          name="liters"
+          min={0.01}
+          step="any"
+          value={liters}
+          onChange={(e) => setLiters(e.target.value)}
+          required
+        />
+      </div>
+
+      <FuelCalcPreview
+        previousReading={previousReading}
+        currentReading={currentReading}
+        liters={liters}
+      />
+    </>
+  );
 }
 
 export function VehicleFuelClient({
@@ -42,8 +265,9 @@ export function VehicleFuelClient({
   const [editItem, setEditItem] = useState<VehicleFuelEntry | null>(null);
   const [, startTransition] = useTransition();
 
-  const defaultPreviousReading = vehicleFuelLast?.current_reading ?? 0;
-  const defaultPreviousFillingDate = toDateInputValue(vehicleFuelLast?.filling_date);
+  const defaultPreviousReading = Number(vehicleFuelLast?.current_reading ?? 0);
+  const lastFillingDate = toDateInputValue(vehicleFuelLast?.filling_date);
+  const isFirstFill = !vehicleFuelLast;
 
   const columns: ColumnDef<VehicleFuelEntry>[] = [
     {
@@ -77,7 +301,13 @@ export function VehicleFuelClient({
     },
     {
       accessorKey: "mileage",
-      header: "Mileage",
+      header: "Mileage (km/L)",
+      cell: ({ row }) => {
+        const m = row.original.mileage;
+        if (m == null || m === "") return "—";
+        const num = Number(m);
+        return Number.isFinite(num) ? num.toFixed(2) : String(m);
+      },
     },
     {
       id: "actions",
@@ -108,77 +338,6 @@ export function VehicleFuelClient({
     },
   ];
 
-  const AddFuelForm = () => (
-    <>
-      <input type="hidden" name="vehicle_id" value={vehicle.vehicle_id} />
-      {defaultPreviousFillingDate ? (
-        <input type="hidden" name="previous_filling_date" value={defaultPreviousFillingDate} />
-      ) : null}
-      <div className="space-y-2">
-        <Label>Filling Date</Label>
-        <Input type="date" name="filling_date" required />
-      </div>
-      <div className="space-y-2">
-        <Label>Previous Reading</Label>
-        <input type="hidden" name="previous_reading" value={defaultPreviousReading} />
-        <Input
-          type="number"
-          defaultValue={defaultPreviousReading}
-          readOnly
-          className="bg-muted"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Current Reading</Label>
-        <Input type="number" name="current_reading" min={0} required />
-      </div>
-      <div className="space-y-2">
-        <Label>Liters</Label>
-        <Input name="liters" required />
-      </div>
-    </>
-  );
-
-  const EditFuelForm = ({ item }: { item: VehicleFuelEntry }) => (
-    <>
-      <input type="hidden" name="vehicle_id" value={vehicle.vehicle_id} />
-      <input type="hidden" name="vehicle_fuel_id" value={item.vehicle_fuel_id} />
-      <div className="space-y-2">
-        <Label>Filling Date</Label>
-        <Input
-          type="date"
-          name="filling_date"
-          defaultValue={toDateInputValue(item.filling_date)}
-          required
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Previous Reading</Label>
-        <input type="hidden" name="previous_reading" value={item.previous_reading ?? 0} />
-        <Input
-          type="number"
-          defaultValue={item.previous_reading ?? 0}
-          readOnly
-          className="bg-muted"
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Current Reading</Label>
-        <Input
-          type="number"
-          name="current_reading"
-          min={0}
-          defaultValue={item.current_reading}
-          required
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Liters</Label>
-        <Input name="liters" defaultValue={item.liters} required />
-      </div>
-    </>
-  );
-
   return (
     <div>
       <div className="mb-4">
@@ -192,14 +351,28 @@ export function VehicleFuelClient({
 
       <PageHeader
         title={`Vehicle Fuel - ${vehicle.registration_no}`}
-        description={`${vehicle.make_type_name ?? ""} ${vehicle.variant_name ?? ""}`.trim() || "Fuel records"}
+        description={
+          `${vehicle.make_type_name ?? ""} ${vehicle.variant_name ?? ""}`.trim() ||
+          "Fuel records · Mileage = (Current − Previous) ÷ Liters"
+        }
       >
         <CrudDialog title="Add Fuel Record" onSubmit={createVehicleFuelAction}>
-          <AddFuelForm />
+          <AddFuelForm
+            vehicleId={vehicle.vehicle_id}
+            previousReading={defaultPreviousReading}
+            lastFillingDate={lastFillingDate}
+            isFirstFill={isFirstFill}
+          />
         </CrudDialog>
       </PageHeader>
 
-      <DataTable columns={columns} data={fuelEntries} searchKey="filling_date" />
+      <DataTable
+        columns={columns}
+        data={fuelEntries}
+        searchKey="filling_date"
+        exportTitle={`Vehicle Fuel - ${vehicle.registration_no}`}
+        exportFileName="vehicle-fuel"
+      />
 
       {editItem && (
         <CrudDialog
@@ -209,7 +382,11 @@ export function VehicleFuelClient({
           onOpenChange={(open) => !open && setEditItem(null)}
           hideTrigger
         >
-          <EditFuelForm item={editItem} />
+          <EditFuelForm
+            vehicleId={vehicle.vehicle_id}
+            item={editItem}
+            fuelEntries={fuelEntries}
+          />
         </CrudDialog>
       )}
     </div>

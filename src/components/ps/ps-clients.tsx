@@ -134,7 +134,7 @@ export function PsClient({ stations }: { stations: PoliceStation[] }) {
         </CrudDialog>
       </PageHeader>
 
-      <DataTable columns={columns} data={stations} searchKey="ps_name" searchPlaceholder="Search PS..." />
+      <DataTable columns={columns} data={stations} searchKey="ps_name" searchPlaceholder="Search PS..."  exportTitle="Police Stations" exportFileName="police-stations"/>
 
       {edit && (
         <CrudDialog
@@ -253,6 +253,8 @@ export function OfficersClient({ officers }: { officers: Officer[] }) {
         data={officers}
         searchKey="officer_name"
         searchPlaceholder="Search:"
+        exportTitle="Officers"
+        exportFileName="officers"
       />
       {edit && (
         <CrudDialog title="Edit Officer" onSubmit={updateOfficerAction} open={!!edit} onOpenChange={(o) => !o && setEdit(null)} hideTrigger>

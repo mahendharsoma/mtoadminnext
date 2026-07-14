@@ -104,7 +104,7 @@ export function VehicleFuelReportClient({
           data={rows}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Vehicle Fuel Report" exportFileName="vehicle-fuel-report"/>
       </CardContent>
     </Card>
   );

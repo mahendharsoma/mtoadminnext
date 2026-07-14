@@ -106,7 +106,7 @@ export function JobCardsClient({ jobCards }: { jobCards: JobCard[] }) {
           data={jobCards}
           searchKey="registration_no"
           searchPlaceholder="Search:"
-        />
+         exportTitle="Job Card List" exportFileName="job-card-list"/>
       </CardContent>
     </Card>
   );
